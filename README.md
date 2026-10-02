@@ -6,6 +6,8 @@ Alles läuft lokal im Browser – kein Backend, kein Konto.
 
 **Stack:** React 19 · TypeScript 7 · Vite 8 · Tailwind CSS 4 · Zustand 5 · lucide-react · vite-plugin-pwa · Vitest
 
+**Live:** https://mc-kinley2982.github.io/lifeos/
+
 ## Starten
 
 ```bash
@@ -16,13 +18,23 @@ npm run build      # Typecheck + Produktions-Build inkl. Service Worker
 npm run preview    # Produktions-Build lokal ansehen
 ```
 
-### Auf dem iPhone installieren
+### Veröffentlichung (GitHub Pages)
 
-1. `npm run build` und den Ordner `dist/` auf einen HTTPS-Host legen (z. B. Netlify, Vercel, GitHub Pages).
-2. Seite in Safari öffnen → **Teilen** → **Zum Home-Bildschirm**.
-3. Die App startet dann im Vollbild; das App-Grundgerüst ist offline verfügbar.
+Jeder Push auf `main` startet `.github/workflows/deploy.yml`: Abhängigkeiten installieren → Tests →
+Build mit `GITHUB_PAGES=true` (Base-Pfad `/lifeos/`) → Veröffentlichung auf GitHub Pages.
+Schlägt ein Test fehl, bleibt die bisherige Version online.
 
 Hash-Routing (`#/woche`) sorgt dafür, dass kein Server-Rewrite nötig ist.
+
+### Auf dem iPhone installieren
+
+1. https://mc-kinley2982.github.io/lifeos/ in **Safari** öffnen.
+2. **Teilen** → **Zum Home-Bildschirm**.
+3. Die App startet dann im Vollbild; das App-Grundgerüst ist auch offline verfügbar.
+
+Wichtig: Die Home-Bildschirm-App hat auf iOS einen eigenen Speicher, getrennt von Safari-Tabs.
+Am besten erst installieren und dann dort einrichten. Jedes Gerät hat seine eigenen Daten –
+zum Übertragen „Mein Alltag → Daten & Backup“ (Export/Import) nutzen.
 
 ## Architektur
 

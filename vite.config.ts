@@ -4,7 +4,12 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// GitHub Pages liefert die App unter https://mc-kinley2982.github.io/lifeos/ aus.
+// Der Deploy-Workflow setzt GITHUB_PAGES=true; lokal bleibt der Base-Pfad "/".
+const base = process.env.GITHUB_PAGES === 'true' ? '/lifeos/' : '/';
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     tailwindcss(),
@@ -20,8 +25,9 @@ export default defineConfig({
         background_color: '#0b0b10',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
+        id: base,
+        start_url: base,
+        scope: base,
         icons: [
           { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
