@@ -33,4 +33,6 @@ export const createDataSlice: SliceCreator<DataActions> = (set, get) => ({
   },
 
   resetAll: () => set(emptyData()),
+
+  replaceData: (data) => set(normalizeData(data)),
 });

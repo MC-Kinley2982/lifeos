@@ -4,7 +4,7 @@ import { useSyncExternalStore } from 'react';
  * Minimaler Hash-Router (#/woche, #/tag/2026-10-03 …).
  * Hash-Routing funktioniert ohne Server-Konfiguration und zuverlässig als PWA auf dem iPhone.
  */
-export type RouteName = 'today' | 'day' | 'week' | 'tasks' | 'goals' | 'events' | 'routines' | 'settings' | 'more';
+export type RouteName = 'today' | 'day' | 'week' | 'school' | 'tasks' | 'goals' | 'events' | 'routines' | 'settings' | 'more';
 
 export interface Route {
   name: RouteName;
@@ -15,6 +15,7 @@ const SEGMENT_TO_ROUTE: Record<string, RouteName> = {
   '': 'today',
   tag: 'day',
   woche: 'week',
+  schule: 'school',
   aufgaben: 'tasks',
   ziele: 'goals',
   termine: 'events',
@@ -27,6 +28,7 @@ export const PATHS = {
   today: '/',
   day: (date: string) => `/tag/${date}`,
   week: (date?: string) => (date ? `/woche/${date}` : '/woche'),
+  school: (tab?: string) => (tab ? `/schule/${tab}` : '/schule'),
   tasks: '/aufgaben',
   goals: '/ziele',
   events: '/termine',

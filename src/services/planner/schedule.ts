@@ -1,4 +1,4 @@
-import { eventSource, mealSource, routineSource, SLEEP_SOURCE, taskSource } from '../../domain/sources';
+import { eventSource, examSource, homeworkSource, mealSource, routineSource, SLEEP_SOURCE, taskSource } from '../../domain/sources';
 import {
   addDays,
   getWeekday,
@@ -13,6 +13,7 @@ import type {
   CalendarEvent,
   DaySchedule,
   DateKey,
+  LessonInfo,
   ScheduleBlock,
   SleepSettings,
   SleepTimes,
@@ -20,6 +21,7 @@ import type {
   TimeSlot,
   Weekday,
 } from '../../domain/types';
+import { lessonsForWeekday, schoolSourceInfo, subjectById, subjectLabel, toLessonInfo } from '../school/timetable';
 import { getDailyState, isSourceActive, resolveDayState } from './dayState';
 import type { PlannerData } from './types';
 
@@ -27,13 +29,20 @@ const NOON = 12 * 60;
 /** Lücken unter dieser Länge zählen nicht als freie Zeit (reines Rauschen zwischen Blöcken). */
 const NOISE_GAP_MIN = 5;
 
+/** Selbst geplante Arbeit (zählt bei der Planung als "bereits verplant"). */
+export const WORK_KINDS: BlockKind[] = ['task', 'homework', 'study'];
+
 const KIND_ORDER: Record<BlockKind, number> = {
   sleep: 0,
   travel: 1,
+  school: 2,
   routine: 2,
+  exam: 3,
   event: 3,
   meal: 4,
   task: 5,
+  homework: 5,
+  study: 5,
   break: 6,
 };
 
@@ -107,10 +116,32 @@ export function buildDaySchedule(data: PlannerData, date: DateKey): DaySchedule 
     blocks.push(makeBlock(date, 'meal', meal.name, start, end, meal.color, key, { sourceId: meal.id, skippable: true }));
   }
 
+  // ── Schule laut Stundenplan ─────────────────────────────────
+  // An Tagen mit Unterricht ersetzt der Stundenplan die Zeiten der verknüpften Routine.
+  // Die Schulzeit behält deren Quelle, sodass Weg, Pausen, Zustands- und Energie-Regeln weiter gelten.
+  const school = schoolSourceInfo(data);
+  const weekdayLessons = settings.school.enabled ? lessonsForWeekday(data, weekday) : [];
+  const timetableDay = weekdayLessons.length > 0 && isDateInRange(date, school.validFrom, school.validUntil);
+  let lessons: LessonInfo[] = [];
+  if (timetableDay && gate(school.sourceKey, school.title, school.categoryId)) {
+    lessons = weekdayLessons.map((e) => toLessonInfo(data, e));
+    const start = Math.min(...lessons.map((l) => l.start));
+    const end = Math.max(...lessons.map((l) => l.end));
+    const main = makeBlock(date, 'school', school.title, start, end, school.color, school.sourceKey, {
+      sourceId: school.routineId,
+      categoryId: school.categoryId,
+      priority: school.priority,
+      skippable: true,
+      lessons,
+    });
+    blocks.push(main, ...travelBlocks(main, school.travelBeforeMin, school.travelAfterMin));
+  }
+
   // ── Routinen ────────────────────────────────────────────────
   for (const routine of data.routines) {
     if (!routine.enabled || !routine.weekdays.includes(weekday)) continue;
     if (!isDateInRange(date, routine.validFrom, routine.validUntil)) continue;
+    if (timetableDay && routine.id === school.routineId) continue; // durch den Stundenplan ersetzt
     const key = routineSource(routine.id);
     if (!gate(key, routine.name, routine.categoryId)) continue;
     const start = toMinutes(routine.start);
@@ -148,6 +179,23 @@ export function buildDaySchedule(data: PlannerData, date: DateKey): DaySchedule 
     blocks.push(main, ...travelBlocks(main, event.travelBeforeMin, event.travelAfterMin));
   }
 
+  // ── Tests / Klassenarbeiten ─────────────────────────────────
+  // Werden immer angezeigt (auch an Krankheitstagen) – nichts wird automatisch gelöscht.
+  const exams = data.exams.filter((e) => e.date === date);
+  for (const exam of exams) {
+    if (!exam.startTime) continue;
+    const label = subjectLabel(subjectById(data, exam.subjectId));
+    const start = toMinutes(exam.startTime);
+    const end = exam.endTime && toMinutes(exam.endTime) > start ? toMinutes(exam.endTime) : start + 45;
+    blocks.push(
+      makeBlock(date, 'exam', `${label.name} · ${exam.title}`, start, end, label.color, examSource(exam.id), {
+        sourceId: exam.id,
+        priority: exam.priority,
+        suffix: 'exam',
+      }),
+    );
+  }
+
   // ── Pausen-Regeln ───────────────────────────────────────────
   blocks.push(...breakBlocks(data, date, blocks, awake, skipped));
 
@@ -166,11 +214,48 @@ export function buildDaySchedule(data: PlannerData, date: DateKey): DaySchedule 
     );
   }
 
+  // ── Hausaufgaben- und Lernblöcke ────────────────────────────
+  const workCategory = settings.school.workCategoryId;
+  for (const hw of data.homework) {
+    const label = subjectLabel(subjectById(data, hw.subjectId));
+    for (const b of hw.plannedBlocks) {
+      if (b.date !== date) continue;
+      const start = toMinutes(b.start);
+      blocks.push(
+        makeBlock(date, 'homework', `${label.name}: ${hw.title || 'Hausaufgabe'}`, start, start + b.durationMin, label.color, homeworkSource(hw.id), {
+          sourceId: hw.id,
+          itemId: b.id,
+          categoryId: workCategory,
+          priority: hw.priority,
+          done: b.done || hw.status === 'done',
+          suffix: b.id,
+        }),
+      );
+    }
+  }
+  for (const exam of data.exams) {
+    const label = subjectLabel(subjectById(data, exam.subjectId));
+    for (const s of exam.studySessions) {
+      if (s.date !== date) continue;
+      const start = toMinutes(s.start);
+      blocks.push(
+        makeBlock(date, 'study', `Lernen: ${label.name} · ${exam.title}`, start, start + s.durationMin, label.color, examSource(exam.id), {
+          sourceId: exam.id,
+          itemId: s.id,
+          categoryId: workCategory,
+          priority: exam.priority,
+          done: s.done,
+          suffix: s.id,
+        }),
+      );
+    }
+  }
+
   blocks.sort((a, b) => a.start - b.start || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.end - b.end);
 
   const busy = blocks.filter((b) => b.blocksFreeTime).map((b) => ({ start: b.start, end: b.end }));
   const freeSlots = subtractSlots([awake], busy).filter((s) => s.end - s.start >= NOISE_GAP_MIN);
-  const scheduledTaskMin = blocks.filter((b) => b.kind === 'task').reduce((sum, b) => sum + (b.end - b.start), 0);
+  const scheduledTaskMin = blocks.filter((b) => WORK_KINDS.includes(b.kind)).reduce((sum, b) => sum + (b.end - b.start), 0);
 
   return {
     date,
@@ -179,6 +264,8 @@ export function buildDaySchedule(data: PlannerData, date: DateKey): DaySchedule 
     awake,
     blocks,
     allDayEvents,
+    lessons,
+    exams,
     inactive,
     freeSlots,
     totalFreeMin: totalMinutes(freeSlots),
@@ -197,6 +284,9 @@ interface BlockOptions {
   relatedTo?: string;
   skippable?: boolean;
   suffix?: string;
+  itemId?: string;
+  done?: boolean;
+  lessons?: LessonInfo[];
 }
 
 function makeBlock(
@@ -225,6 +315,9 @@ function makeBlock(
     goalId: opts.goalId,
     relatedTo: opts.relatedTo,
     skippable: opts.skippable ?? false,
+    ...(opts.itemId ? { itemId: opts.itemId } : {}),
+    ...(opts.done !== undefined ? { done: opts.done } : {}),
+    ...(opts.lessons ? { lessons: opts.lessons } : {}),
   };
 }
 
@@ -261,7 +354,7 @@ function breakBlocks(
   skipped: Set<SourceKey>,
 ): ScheduleBlock[] {
   const out: ScheduleBlock[] = [];
-  const anchors = existing.filter((b) => b.kind === 'routine' || b.kind === 'event' || b.kind === 'meal');
+  const anchors = existing.filter((b) => b.kind === 'routine' || b.kind === 'school' || b.kind === 'event' || b.kind === 'meal');
   const blocking = existing.filter((b) => b.blocksFreeTime && b.kind !== 'sleep');
 
   for (const rule of data.settings.breakRules) {

@@ -1,5 +1,6 @@
 import { intersectSlots, roundUpTo, toMinutes, totalMinutes } from '../../domain/time';
 import type { DaySchedule, PlanningSettings, TimeOfDay, TimeSlot } from '../../domain/types';
+import { WORK_KINDS } from './schedule';
 
 /** Freie Lücken ab einem Zeitpunkt (z. B. "jetzt"). */
 export function freeSlotsFrom(schedule: DaySchedule, fromMinute: number): TimeSlot[] {
@@ -12,24 +13,26 @@ export function freeMinutesFrom(schedule: DaySchedule, fromMinute: number): numb
   return totalMinutes(freeSlotsFrom(schedule, fromMinute));
 }
 
-/** Bereits fest eingeplante Aufgaben-Minuten ab einem Zeitpunkt. */
+/** Bereits fest eingeplante Arbeit (Aufgaben, Hausaufgaben, Lernzeit) ab einem Zeitpunkt. */
 export function scheduledTaskMinutesFrom(schedule: DaySchedule, fromMinute: number): number {
   return schedule.blocks
-    .filter((b) => b.kind === 'task' && b.end > fromMinute)
+    .filter((b) => WORK_KINDS.includes(b.kind) && b.end > fromMinute)
     .reduce((sum, b) => sum + (b.end - Math.max(b.start, fromMinute)), 0);
 }
 
 /**
  * Wie viel Zeit darf an einem Tag (noch) automatisch verplant werden?
- * Schützt Freizeit: höchstens `maxPlannedShare` der planbaren Zeit und mindestens
- * `minFreeTimeMin` bleiben frei. Bereits geplante Aufgaben zählen mit.
+ * Schützt Freizeit: höchstens `share` der planbaren Zeit (Standard: allgemeiner Planungsanteil)
+ * und mindestens `minFreeTimeMin` bleiben frei. Bereits geplante Arbeit zählt mit.
+ * Ein Tageszustand (z. B. Krank) kann den Anteil zusätzlich begrenzen.
  */
-export function planningBudget(schedule: DaySchedule, planning: PlanningSettings, fromMinute = 0): number {
+export function planningBudget(schedule: DaySchedule, planning: PlanningSettings, fromMinute = 0, share = planning.maxPlannedShare): number {
   const free = freeMinutesFrom(schedule, fromMinute);
   const scheduled = scheduledTaskMinutesFrom(schedule, fromMinute);
   const plannable = free + scheduled;
-  const share = Math.max(0, Math.min(1, planning.maxPlannedShare));
-  const cap = Math.min(plannable * share, plannable - planning.minFreeTimeMin);
+  const stateShare = schedule.dayState.definition.maxPlannedShare;
+  const effective = Math.max(0, Math.min(1, stateShare !== undefined ? Math.min(share, stateShare) : share));
+  const cap = Math.min(plannable * effective, plannable - planning.minFreeTimeMin);
   return Math.max(0, Math.floor(cap - scheduled));
 }
 

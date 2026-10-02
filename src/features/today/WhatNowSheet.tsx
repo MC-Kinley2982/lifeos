@@ -6,6 +6,7 @@ import type { EnergyLevel } from '../../domain/types';
 import { getPlanner } from '../../services/planner';
 import type { SuggestionItem } from '../../services/planner';
 import { useNow, usePlannerData } from '../../store/hooks';
+import { replanSchool } from '../../store/schoolAutomation';
 import { useAppStore } from '../../store/useAppStore';
 import { Button } from '../../ui/Button';
 import { cn } from '../../ui/cn';
@@ -22,13 +23,20 @@ export function WhatNowSheet({ onClose }: { onClose: () => void }) {
   const minuteKey = Math.floor(now.getTime() / 60_000);
   const s = useMemo(() => getPlanner().suggestNow(data, now), [data, minuteKey]);
   const startsLater = s.fromMinute > minutesSinceMidnight(now) + 1;
-  const { setTaskSchedule, updateTask, toggleTaskDone, applyPlan, setEnergy } = useAppStore.getState();
+  const { setTaskSchedule, updateTask, toggleTaskDone, applyPlan, setEnergy, addSchoolBlock, updateHomework, toggleHomeworkDone } = useAppStore.getState();
   const manualEnergy = data.dailyStates[today]?.energy;
   const ModeIcon = MODE_ICON[s.mode];
 
   const start = (item: SuggestionItem, offset: number) => {
     const startMin = roundUpTo(s.fromMinute, 5) + offset;
-    if (item.task) {
+    if (item.homework || item.exam) {
+      // Jetzt anfangen = manueller Block ab jetzt; die übrige automatische Planung passt sich an.
+      const owner = item.homework ? ({ kind: 'homework', id: item.homework.id } as const) : ({ kind: 'exam', id: item.exam!.id } as const);
+      addSchoolBlock(owner, { date: today, start: toHHMM(startMin), durationMin: item.minutes, source: 'manual', done: false });
+      if (item.homework?.status === 'todo') updateHomework(item.homework.id, { status: 'in_progress' });
+      replanSchool(owner.kind === 'homework' ? { homeworkIds: [owner.id], reset: true } : { examIds: [owner.id], reset: true });
+      toast(`${item.title} ab ${toHHMM(startMin)} eingeplant`);
+    } else if (item.task) {
       setTaskSchedule(item.task.id, { date: today, start: toHHMM(startMin) });
       if (item.task.status === 'todo') updateTask(item.task.id, { status: 'in_progress' });
       toast(`${item.title} ab ${toHHMM(startMin)} eingeplant`);
@@ -97,13 +105,18 @@ export function WhatNowSheet({ onClose }: { onClose: () => void }) {
                       ))}
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {s.mode !== 'night' && !(item.task?.schedule?.start && item.task.schedule.date === today && s.currentBlock?.sourceId === item.task.id) && (
+                      {s.mode !== 'night' && !item.blockId && !(item.task?.schedule?.start && item.task.schedule.date === today && s.currentBlock?.sourceId === item.task.id) && (
                         <Button size="sm" variant="secondary" icon={Play} onClick={() => start(item, itemOffset)}>
                           {startsLater || itemOffset > 0 ? `Ab ${toHHMM(roundUpTo(s.fromMinute, 5) + itemOffset)} einplanen` : 'Jetzt starten'}
                         </Button>
                       )}
                       {item.task && (
                         <Button size="sm" variant="ghost" icon={Check} onClick={() => { toggleTaskDone(item.task!.id); toast('Erledigt – stark!'); }}>
+                          Erledigt
+                        </Button>
+                      )}
+                      {item.homework && (
+                        <Button size="sm" variant="ghost" icon={Check} onClick={() => { toggleHomeworkDone(item.homework!.id); toast('Hausaufgabe erledigt – stark!'); }}>
                           Erledigt
                         </Button>
                       )}

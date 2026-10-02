@@ -24,6 +24,10 @@ function makeData(today: DateKey = TUESDAY): PlannerData {
     dailyStates: {},
     vacations: [],
     specialDays: [],
+    subjects: ex.subjects,
+    timetable: ex.timetable,
+    homework: [],
+    exams: ex.exams,
   };
 }
 

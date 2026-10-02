@@ -41,6 +41,10 @@ jobs:
           # Schaltet in vite.config.ts den Base-Pfad auf "/lifeos/" um,
           # damit alle Assets unter dem GitHub-Pages-Unterpfad korrekt geladen werden.
           GITHUB_PAGES: 'true'
+          # Cloud-Sync (optional): Repository-Variablen unter Settings → Secrets and variables → Actions → Variables.
+          # Ohne diese Werte wird LifeOS rein lokal gebaut.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
       - name: GitHub Pages konfigurieren
         uses: actions/configure-pages@v6

@@ -18,6 +18,10 @@ export function usePlannerData(): PlannerData {
       dailyStates: s.dailyStates,
       vacations: s.vacations,
       specialDays: s.specialDays,
+      subjects: s.subjects,
+      timetable: s.timetable,
+      homework: s.homework,
+      exams: s.exams,
     })),
   );
 }

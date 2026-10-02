@@ -3,6 +3,7 @@ import { Download, Upload } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { todayKey } from '../../../domain/time';
 import { isStorageAvailable, STORAGE_KEY } from '../../../services/storage/storage';
+import { cloud } from '../../../store/cloud';
 import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../../ui/Button';
 import { DeleteButton } from '../../../ui/controls';
@@ -22,7 +23,9 @@ function storageSize(): string {
 export function DataSection() {
   const { exportData, importData, resetAll, completeOnboarding } = useAppStore.getState();
   const name = useAppStore((s) => s.settings.profile.name);
-  const counts = useAppStore(useShallow((s) => ({ r: s.routines.length, t: s.tasks.length, e: s.events.length, g: s.goals.length })));
+  const counts = useAppStore(
+    useShallow((s) => ({ r: s.routines.length, t: s.tasks.length, e: s.events.length, g: s.goals.length, sub: s.subjects.length, hw: s.homework.length, ex: s.exams.length })),
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const available = isStorageAvailable();
@@ -56,7 +59,7 @@ export function DataSection() {
         </SettingRow>
         <SettingRow label="Gespeichert">
           <span className="text-sm text-ink-muted">
-            {counts.r} Routinen · {counts.e} Termine · {counts.t} Aufgaben · {counts.g} Ziele
+            {counts.r} Routinen · {counts.e} Termine · {counts.t} Aufgaben · {counts.g} Ziele · {counts.sub} Fächer · {counts.hw} Hausaufgaben · {counts.ex} Tests
           </span>
         </SettingRow>
       </SettingsGroup>
@@ -75,8 +78,16 @@ export function DataSection() {
         <SettingRow label="Beispiel-Alltag laden" description="Ersetzt alle Daten durch den Beispiel-Alltag.">
           <DeleteButton label="Beispiel laden" onConfirm={() => { completeOnboarding({ name, withExample: true, today: todayKey() }); toast('Beispiel-Alltag geladen'); }} />
         </SettingRow>
-        <SettingRow label="Alle Daten löschen" description="Startet die App komplett neu.">
-          <DeleteButton label="Alles löschen" onConfirm={resetAll} />
+        <SettingRow label="Alle Daten löschen" description="Nur auf diesem Gerät – ein verbundenes Konto wird vorher abgemeldet, die Cloud-Daten bleiben erhalten.">
+
+          <DeleteButton
+            label="Alles löschen"
+            onConfirm={() => {
+              // Nur dieses Gerät zurücksetzen: vorher abmelden und vom Konto trennen,
+              // damit die Löschung nicht auf andere Geräte synchronisiert wird.
+              void cloud.forgetDevice().then(resetAll);
+            }}
+          />
         </SettingRow>
       </SettingsGroup>
     </div>

@@ -1,4 +1,4 @@
-import { Bed, Car, SquareCheck, Coffee, Repeat, CalendarClock, Utensils, type LucideIcon } from 'lucide-react';
+import { Bed, BookOpenCheck, CalendarClock, Car, ClipboardList, Coffee, GraduationCap, NotebookPen, Repeat, SquareCheck, Utensils, type LucideIcon } from 'lucide-react';
 import type { BlockKind } from '../../domain/types';
 
 export const BLOCK_ICON: Record<BlockKind, LucideIcon> = {
@@ -9,6 +9,10 @@ export const BLOCK_ICON: Record<BlockKind, LucideIcon> = {
   travel: Car,
   break: Coffee,
   task: SquareCheck,
+  school: GraduationCap,
+  homework: NotebookPen,
+  study: BookOpenCheck,
+  exam: ClipboardList,
 };
 
 export const BLOCK_KIND_LABEL: Record<BlockKind, string> = {
@@ -19,4 +23,8 @@ export const BLOCK_KIND_LABEL: Record<BlockKind, string> = {
   travel: 'Weg',
   break: 'Pause',
   task: 'Aufgabe',
+  school: 'Schule',
+  homework: 'Hausaufgabe',
+  study: 'Lernen',
+  exam: 'Test',
 };

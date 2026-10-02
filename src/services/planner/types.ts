@@ -4,14 +4,18 @@ import type {
   DateKey,
   EnergyLevel,
   EnergyState,
+  Exam,
   Goal,
+  Homework,
   ID,
   Routine,
   ScheduleBlock,
   Settings,
   SpecialDay,
+  Subject,
   Task,
   TaskEnergy,
+  TimetableEntry,
   Vacation,
 } from '../../domain/types';
 
@@ -29,6 +33,10 @@ export interface PlannerData {
   dailyStates: Record<DateKey, DailyState>;
   vacations: Vacation[];
   specialDays: SpecialDay[];
+  subjects: Subject[];
+  timetable: TimetableEntry[];
+  homework: Homework[];
+  exams: Exam[];
 }
 
 export interface PlanItem {
@@ -78,6 +86,10 @@ export interface SuggestionItem {
   key: string;
   task?: Task;
   goal?: Goal;
+  homework?: Homework;
+  exam?: Exam;
+  /** Geplanter Block, der gerade läuft (Hausaufgabe/Lernen). */
+  blockId?: ID;
   title: string;
   minutes: number;
   /** Nur ein Teil der Aufgabe passt in die verfügbare Zeit. */

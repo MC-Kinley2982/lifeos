@@ -7,14 +7,17 @@ import { createDataSlice } from './slices/dataSlice';
 import { createEventsSlice } from './slices/eventsSlice';
 import { createGoalsSlice } from './slices/goalsSlice';
 import { createRoutinesSlice } from './slices/routinesSlice';
+import { createSchoolSlice } from './slices/schoolSlice';
 import { createSettingsSlice } from './slices/settingsSlice';
 import { createTasksSlice } from './slices/tasksSlice';
 import type { AppData, AppState } from './types';
 
 /**
  * Zentraler App-Store.
- * Bereiche: settings · routines · events · tasks · goals · dailyStates (+ vacations, specialDays).
+ * Bereiche: settings · routines · events · tasks · goals · dailyStates (+ vacations, specialDays)
+ * · Schule (subjects, timetable, homework, exams).
  * Persistiert in localStorage; nur Daten werden gespeichert, keine Funktionen.
+ * Die Cloud-Synchronisierung (services/sync) liest und ersetzt Daten über diesen Store.
  */
 export const useAppStore = create<AppState>()(
   persist(
@@ -25,6 +28,7 @@ export const useAppStore = create<AppState>()(
       ...createTasksSlice(...a),
       ...createGoalsSlice(...a),
       ...createDailySlice(...a),
+      ...createSchoolSlice(...a),
       ...createDataSlice(...a),
     }),
     {

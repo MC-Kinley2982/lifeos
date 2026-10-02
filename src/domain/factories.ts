@@ -1,7 +1,22 @@
 import { CATEGORY_IDS, STATE_IDS } from './defaults';
 import { createId, nowIso } from './ids';
 import { WORKDAYS } from './time';
-import type { CalendarEvent, DateKey, Goal, Meal, Routine, Settings, SpecialDay, Task, Vacation } from './types';
+import type {
+  CalendarEvent,
+  DateKey,
+  Exam,
+  Goal,
+  Homework,
+  Meal,
+  Routine,
+  Settings,
+  SpecialDay,
+  Subject,
+  Task,
+  TimetableEntry,
+  Vacation,
+  Weekday,
+} from './types';
 
 /**
  * Vorlagen für neue Einträge (Formular-Startwerte).
@@ -12,6 +27,31 @@ export type RoutineInput = Omit<Routine, 'id' | 'createdAt' | 'updatedAt'>;
 export type EventInput = Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>;
 export type TaskInput = Omit<Task, 'id' | 'createdAt' | 'updatedAt'>;
 export type GoalInput = Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>;
+export type SubjectInput = Omit<Subject, 'id' | 'createdAt' | 'updatedAt'>;
+export type TimetableEntryInput = Omit<TimetableEntry, 'id' | 'createdAt' | 'updatedAt'>;
+export type HomeworkInput = Omit<Homework, 'id' | 'createdAt' | 'updatedAt'>;
+export type ExamInput = Omit<Exam, 'id' | 'createdAt' | 'updatedAt'>;
+
+export function subjectDraft(): SubjectInput {
+  return { name: '', shortName: '', color: '#60a5fa' };
+}
+
+export function lessonDraft(subjectId: string, weekday: Weekday, start = '08:00', end = '08:45'): TimetableEntryInput {
+  return { subjectId, weekday, start, end };
+}
+
+/** Prüfungs-Vorlage; Lernzeit-Standard kommt aus den Schul-Einstellungen. */
+export function examDraft(settings: Settings, subjectId: string, date: DateKey): ExamInput {
+  return {
+    subjectId,
+    title: 'Klassenarbeit',
+    date,
+    priority: 'high',
+    energy: 'medium',
+    desiredStudyMinutes: settings.school.defaultStudyMinutes,
+    studySessions: [],
+  };
+}
 
 function pickCategory(settings: Settings, preferred: string): { id: string; color: string } {
   const cat = settings.categories.find((c) => c.id === preferred) ?? settings.categories[0];

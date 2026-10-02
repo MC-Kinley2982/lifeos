@@ -11,12 +11,16 @@ import { EnergySection } from './sections/EnergySection';
 import { MealsSection } from './sections/MealsSection';
 import { PlanningSection } from './sections/PlanningSection';
 import { ProfileSection } from './sections/ProfileSection';
+import { AccountSection } from './sections/AccountSection';
+import { SchoolSection } from './sections/SchoolSection';
 import { SleepSection } from './sections/SleepSection';
 import { VacationSection } from './sections/VacationSection';
 import { SETTINGS_SECTIONS } from './sections';
 
 const CONTENT: Record<string, ComponentType> = {
   profil: ProfileSection,
+  konto: AccountSection,
+  schule: SchoolSection,
   schlaf: SleepSection,
   mahlzeiten: MealsSection,
   pausen: BreaksSection,

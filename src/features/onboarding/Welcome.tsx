@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ArrowRight, Check, LayoutTemplate, Sparkles } from 'lucide-react';
+import { ArrowRight, Check, LayoutTemplate, LogIn, Sparkles } from 'lucide-react';
 import { Logo } from '../../app/AppShell';
 import { todayKey } from '../../domain/time';
+import { useCloud } from '../../store/cloud';
 import { useAppStore } from '../../store/useAppStore';
+import { AuthForm } from '../cloud/AuthForm';
 import { Button } from '../../ui/Button';
 import { cn } from '../../ui/cn';
 import { Field, TextInput } from '../../ui/fields';
@@ -11,6 +13,8 @@ export function Welcome() {
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
   const [name, setName] = useState('');
   const [withExample, setWithExample] = useState(true);
+  const [showLogin, setShowLogin] = useState(false);
+  const cloudOn = useCloud((s) => s.mode !== 'off');
 
   const start = () => completeOnboarding({ name: name.trim(), withExample, today: todayKey() });
 
@@ -55,8 +59,26 @@ export function Welcome() {
           <Button type="submit" variant="primary" size="lg" block iconRight={ArrowRight}>
             Los geht's
           </Button>
-          <p className="text-center text-xs text-ink-faint">Alle Daten bleiben lokal auf diesem Gerät. Kein Konto nötig.</p>
+          <p className="text-center text-xs text-ink-faint">
+            {cloudOn ? 'Kein Konto nötig – du kannst dich später anmelden, um Geräte zu synchronisieren.' : 'Alle Daten bleiben lokal auf diesem Gerät. Kein Konto nötig.'}
+          </p>
         </form>
+
+        {cloudOn && (
+          <div className="mt-6 rounded-3xl border border-line bg-surface/80 p-4">
+            {showLogin ? (
+              <AuthForm />
+            ) : (
+              <button type="button" onClick={() => setShowLogin(true)} className="flex w-full items-center justify-between gap-3 text-left">
+                <span>
+                  <span className="block text-sm font-medium">Ich habe schon ein Konto</span>
+                  <span className="block text-xs text-ink-muted">Anmelden und Daten von deinem anderen Gerät übernehmen</span>
+                </span>
+                <LogIn size={18} className="shrink-0 text-violet-300" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

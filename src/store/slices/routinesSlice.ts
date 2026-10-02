@@ -29,6 +29,8 @@ export const createRoutinesSlice: SliceCreator<RoutinesSlice> = (set) => ({
           ...state.settings,
           dayStates: state.settings.dayStates.map((d) => ({ ...d, sourceRules: omitKey(d.sourceRules, key) })),
           breakRules: state.settings.breakRules.filter((r) => !(r.trigger.type === 'afterSource' && r.trigger.sourceKey === key)),
+          school:
+            state.settings.school.linkedRoutineId === id ? { ...state.settings.school, linkedRoutineId: undefined } : state.settings.school,
         },
       };
     }),

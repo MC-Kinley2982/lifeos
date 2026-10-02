@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarClock, Ellipsis, ListTodo, Repeat, Settings, Sun, Target, type LucideIcon } from 'lucide-react';
+import { CalendarDays, CalendarClock, Ellipsis, GraduationCap, ListTodo, Repeat, Settings, Sun, Target, type LucideIcon } from 'lucide-react';
 import { PATHS, type RouteName } from './router';
 
 export interface NavItem {
@@ -13,6 +13,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { route: 'today', label: 'Heute', path: PATHS.today, icon: Sun, alsoActive: ['day'] },
   { route: 'week', label: 'Woche', path: PATHS.week(), icon: CalendarDays },
+  { route: 'school', label: 'Schule', path: PATHS.school(), icon: GraduationCap },
   { route: 'tasks', label: 'Aufgaben', path: PATHS.tasks, icon: ListTodo },
   { route: 'goals', label: 'Ziele', path: PATHS.goals, icon: Target },
   { route: 'events', label: 'Termine', path: PATHS.events, icon: CalendarClock },
@@ -20,14 +21,19 @@ export const NAV_ITEMS: NavItem[] = [
   { route: 'settings', label: 'Mein Alltag', path: PATHS.settings(), icon: Settings },
 ];
 
-/** Mobile Bottom-Navigation: die vier wichtigsten Bereiche + "Mehr". */
+const byRoute = (r: RouteName) => NAV_ITEMS.find((i) => i.route === r)!;
+
+/** Mobile Bottom-Navigation: die wichtigsten Bereiche + "Mehr". */
 export const MOBILE_NAV: NavItem[] = [
-  NAV_ITEMS[0],
-  NAV_ITEMS[1],
-  NAV_ITEMS[2],
-  NAV_ITEMS[3],
-  { route: 'more', label: 'Mehr', path: PATHS.more, icon: Ellipsis, alsoActive: ['events', 'routines', 'settings'] },
+  byRoute('today'),
+  byRoute('week'),
+  byRoute('school'),
+  byRoute('tasks'),
+  { route: 'more', label: 'Mehr', path: PATHS.more, icon: Ellipsis, alsoActive: ['goals', 'events', 'routines', 'settings'] },
 ];
+
+/** Bereiche, die mobil unter "Mehr" liegen. */
+export const MORE_ROUTES: RouteName[] = ['goals', 'events', 'routines', 'settings'];
 
 export function isActive(item: NavItem, current: RouteName): boolean {
   return item.route === current || !!item.alsoActive?.includes(current);

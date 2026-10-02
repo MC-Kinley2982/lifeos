@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { mockCloudPlugin } from './dev/mockCloudPlugin';
 
 // GitHub Pages liefert die App unter https://mc-kinley2982.github.io/lifeos/ aus.
 // Der Deploy-Workflow setzt GITHUB_PAGES=true; lokal bleibt der Base-Pfad "/".
@@ -13,6 +14,8 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // Nur im Dev-Server aktiv (apply: 'serve') – simulierte Cloud für Tests ohne Supabase.
+    mockCloudPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'logo.svg'],
@@ -44,6 +47,6 @@ export default defineConfig({
   ],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'supabase/**/*.test.ts'],
   },
 });

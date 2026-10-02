@@ -8,6 +8,13 @@
       "port": 5180
     },
     {
+      "name": "lifeos-dev-mockcloud",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:mock", "--", "--port", "5182", "--strictPort", "--host", "127.0.0.1"],
+      "port": 5182,
+      "url": "http://127.0.0.1:5182"
+    },
+    {
       "name": "lifeos-preview",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview", "--", "--port", "5181", "--strictPort"],

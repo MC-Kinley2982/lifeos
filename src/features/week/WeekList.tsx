@@ -15,7 +15,7 @@ export function WeekList({ schedules, today }: { schedules: DaySchedule[]; today
         const state = s.dayState.definition;
         const span = Math.max(1, s.awake.end - s.awake.start);
         const pos = (m: number) => `${((Math.max(s.awake.start, Math.min(s.awake.end, m)) - s.awake.start) / span) * 100}%`;
-        const main = s.blocks.filter((b) => b.kind === 'routine' || b.kind === 'event' || b.kind === 'task');
+        const main = s.blocks.filter((b) => ['routine', 'school', 'event', 'exam', 'task', 'homework', 'study'].includes(b.kind));
         return (
           <button
             key={s.date}

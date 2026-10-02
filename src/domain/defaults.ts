@@ -14,12 +14,17 @@ import type {
   DateKey,
   DayStateDefinition,
   EnergySettings,
+  Exam,
   Goal,
   Meal,
   PlanningSettings,
   Routine,
+  SchoolSettings,
   Settings,
+  Subject,
   Task,
+  TimeHHMM,
+  TimetableEntry,
   Weekday,
 } from './types';
 
@@ -85,6 +90,7 @@ export function defaultDayStates(): DayStateDefinition[] {
       categoryRules: { [CATEGORY_IDS.school]: false, [CATEGORY_IDS.sport]: false },
       sourceRules: {},
       energyCap: 2,
+      maxPlannedShare: 0.3,
       message: 'Gute Besserung! Schule und Sport sind pausiert. Plane nur, was wirklich nötig ist.',
     },
     {
@@ -184,6 +190,48 @@ export function defaultBreakRules(): BreakRule[] {
   ];
 }
 
+export function defaultSchoolSettings(): SchoolSettings {
+  return {
+    enabled: true,
+    linkedRoutineId: undefined,
+    categoryId: CATEGORY_IDS.school,
+    travelBeforeMin: 0,
+    travelAfterMin: 0,
+    workCategoryId: CATEGORY_IDS.learning,
+    defaultHomeworkMinutes: 30,
+    defaultHomeworkPriority: 'medium',
+    askForHomework: true,
+    autoPlan: true,
+    allowSplitHomework: true,
+    minBlockMin: 15,
+    maxSchoolShare: 0.8,
+    fallbackDeadlineDays: 7,
+    lookaheadDays: 28,
+    defaultStudyMinutes: 120,
+    defaultStudyLeadDays: 5,
+    defaultStudySessionMin: 45,
+    maxStudyMinPerDay: 60,
+  };
+}
+
+/** Vorschläge für Fächer (Name, Kurzform, Farbe) – werden nur auf Wunsch angelegt. */
+export const SUBJECT_SUGGESTIONS: Array<{ name: string; shortName: string; color: string }> = [
+  { name: 'Mathematik', shortName: 'Ma', color: '#60a5fa' },
+  { name: 'Deutsch', shortName: 'De', color: '#f87171' },
+  { name: 'Englisch', shortName: 'En', color: '#fbbf24' },
+  { name: 'Physik', shortName: 'Ph', color: '#a78bfa' },
+  { name: 'Russisch', shortName: 'Ru', color: '#2dd4bf' },
+  { name: 'Biologie', shortName: 'Bio', color: '#34d399' },
+  { name: 'Chemie', shortName: 'Ch', color: '#22d3ee' },
+  { name: 'Geschichte', shortName: 'Ge', color: '#fb923c' },
+  { name: 'Erdkunde', shortName: 'Ek', color: '#a3e635' },
+  { name: 'Informatik', shortName: 'If', color: '#818cf8' },
+  { name: 'Kunst', shortName: 'Ku', color: '#f472b6' },
+  { name: 'Musik', shortName: 'Mu', color: '#e879f9' },
+  { name: 'Sport', shortName: 'Spo', color: '#4ade80' },
+  { name: 'Religion/Ethik', shortName: 'Re', color: '#94a3b8' },
+];
+
 export function createDefaultSettings(name = ''): Settings {
   return {
     profile: { id: createId('user'), name, createdAt: nowIso() },
@@ -200,6 +248,7 @@ export function createDefaultSettings(name = ''): Settings {
     dayStates: defaultDayStates(),
     categories: defaultCategories(),
     planning: defaultPlanningSettings(),
+    school: defaultSchoolSettings(),
     ui: { weekStartsOn: 0 },
   };
 }
@@ -214,12 +263,35 @@ export interface ExampleData {
   events: CalendarEvent[];
   tasks: Task[];
   goals: Goal[];
+  subjects: Subject[];
+  timetable: TimetableEntry[];
+  exams: Exam[];
 }
 
 function nextWeekday(from: DateKey, weekday: Weekday): DateKey {
   const offset = (weekday - getWeekday(from) + 7) % 7;
   return addDays(from, offset);
 }
+
+/** Klingelzeiten des Beispiel-Stundenplans (1.–7. Stunde). */
+const EXAMPLE_PERIODS: Array<[TimeHHMM, TimeHHMM]> = [
+  ['08:00', '08:45'],
+  ['08:50', '09:35'],
+  ['09:55', '10:40'],
+  ['10:45', '11:30'],
+  ['11:50', '12:35'],
+  ['12:40', '13:25'],
+  ['13:45', '14:30'],
+];
+
+/** Beispiel-Woche: Fach-Kurzform je Stunde (Mo–Fr). */
+const EXAMPLE_WEEK: string[][] = [
+  ['Ma', 'Ma', 'De', 'En', 'Ph', 'Bio'],
+  ['En', 'De', 'Ru', 'Ru', 'Ma', 'Ge', 'Spo'],
+  ['Ma', 'De', 'En', 'Ph', 'Ph', 'Ru'],
+  ['Ma', 'Ma', 'Bio', 'De', 'Ru', 'En', 'Ku'],
+  ['Ph', 'En', 'Ma', 'Ge', 'De', 'De'],
+];
 
 export function createExampleData(today: DateKey, name = ''): ExampleData {
   const ts = nowIso();
@@ -316,8 +388,46 @@ export function createExampleData(today: DateKey, name = ''): ExampleData {
     updatedAt: ts,
   });
 
+  // Schule: Fächer + Stundenplan. Die Routine "Schule" übernimmt an Schultagen die Zeiten des Stundenplans.
+  const subjects: Subject[] = SUBJECT_SUGGESTIONS.filter((s) => ['Ma', 'De', 'En', 'Ph', 'Ru', 'Bio', 'Ge', 'Spo', 'Ku'].includes(s.shortName)).map(
+    (s) => ({ ...s, id: createId('subj'), createdAt: ts, updatedAt: ts }),
+  );
+  const byShort = new Map(subjects.map((s) => [s.shortName, s.id]));
+  const timetable: TimetableEntry[] = EXAMPLE_WEEK.flatMap((lessons, weekday) =>
+    lessons.map((short, period) => ({
+      id: createId('tt'),
+      subjectId: byShort.get(short) ?? subjects[0].id,
+      weekday: weekday as Weekday,
+      start: EXAMPLE_PERIODS[period][0],
+      end: EXAMPLE_PERIODS[period][1],
+      createdAt: ts,
+      updatedAt: ts,
+    })),
+  );
+  settings.school.linkedRoutineId = school.id;
+
+  const exams: Exam[] = [
+    {
+      id: createId('exam'),
+      subjectId: byShort.get('Ma') ?? subjects[0].id,
+      title: 'Klassenarbeit',
+      date: nextWeekday(addDays(today, 8), 3),
+      startTime: '08:00',
+      endTime: '08:45',
+      priority: 'high',
+      energy: 'medium',
+      desiredStudyMinutes: 180,
+      studySessions: [],
+      createdAt: ts,
+      updatedAt: ts,
+    },
+  ];
+
   return {
     settings,
+    subjects,
+    timetable,
+    exams,
     routines: [school, football, chess],
     events: [
       event({

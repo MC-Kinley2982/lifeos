@@ -1,28 +1,7 @@
-import { TIME_OF_DAY_LABEL } from '../../domain/labels';
-import {
-  formatDuration,
-  formatHoursClock,
-  minutesSinceMidnight,
-  roundUpTo,
-  subtractSlots,
-  toDateKey,
-} from '../../domain/time';
-import type {
-  DateKey,
-  DaySchedule,
-  EnergyState,
-  Goal,
-  PlanningSettings,
-  Priority,
-  Task,
-  TaskEnergy,
-  TimeOfDay,
-  TimeSlot,
-} from '../../domain/types';
-import { estimateEnergy, requiredEnergy } from './energy';
-import { freeMinutesFrom, planningBudget, plannableSlots, timeOfDayAt } from './freeTime';
+import { formatDuration, formatHoursClock, toDateKey } from '../../domain/time';
+import type { DateKey, EnergyState, Goal, Priority, Task, TaskEnergy, TimeOfDay } from '../../domain/types';
 import { computeGoalProgress } from './goals';
-import { buildDaySchedule } from './schedule';
+import { bestSlotInDay, buildPlanningDays, reserve, type PlanningDay } from './placement';
 import { priorityScore, urgencyScore } from './scoring';
 import type { PlanItem, PlannerData, PlanOptions, PlanResult, UnplannedItem } from './types';
 
@@ -42,22 +21,8 @@ interface Unit {
   reasons: string[];
 }
 
-interface DayContext {
-  date: DateKey;
-  index: number;
-  schedule: DaySchedule;
-  slots: TimeSlot[];
-  budget: number;
-  initialBudget: number;
-  freeMin: number;
-  plannedMin: number;
-  /** Alle Aufgaben-Blöcke des Tages (bestehende + neu geplante) – für Fokus-/Pausen-Regel. */
-  focus: TimeSlot[];
-  goalSessions: Set<string>;
-}
-
 interface Placement {
-  day: DayContext;
+  day: PlanningDay;
   start: number;
   score: number;
   energy: EnergyState;
@@ -67,31 +32,11 @@ interface Placement {
 /**
  * Regelbasierte Auto-Planung: verteilt offene Aufgaben (und optional Ziel-Einheiten)
  * auf freie Zeit. Schlägt nur vor – übernommen wird erst durch den Nutzer.
+ * Bereits eingeplante Hausaufgaben und Lernzeiten haben Vorrang und zählen zum Budget.
  */
 export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
-  const { planning } = data.settings;
   const today = toDateKey(options.now);
-  const nowMin = minutesSinceMidnight(options.now);
-
-  const days: DayContext[] = options.dates
-    .filter((d) => d >= today)
-    .map((date, index) => {
-      const schedule = buildDaySchedule(data, date);
-      const from = date === today ? roundUpTo(nowMin, planning.granularityMin) : 0;
-      const budget = planningBudget(schedule, planning, from);
-      return {
-        date,
-        index,
-        schedule,
-        slots: plannableSlots(schedule, planning, from),
-        budget,
-        initialBudget: budget,
-        freeMin: freeMinutesFrom(schedule, from),
-        plannedMin: 0,
-        focus: schedule.blocks.filter((b) => b.kind === 'task').map((b) => ({ start: b.start, end: b.end })),
-        goalSessions: new Set<string>(),
-      };
-    });
+  const days = buildPlanningDays(data, options.dates, options.now);
 
   const items: PlanItem[] = [];
   const unplanned: UnplannedItem[] = [];
@@ -112,17 +57,18 @@ export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
 
   const placedGoalMinutes: Record<string, number> = {};
   for (const unit of taskUnits) {
-    const result = placeUnit(data, planning, days, unit, today);
+    const result = placeUnit(data, days, unit, today);
     if ('reason' in result) {
       unplanned.push({ taskId: unit.task?.id, title: unit.title, reason: result.reason });
       continue;
     }
-    items.push(commit(result, unit, planning));
+    items.push(commit(data, result, unit));
     if (unit.task?.goalId) placedGoalMinutes[unit.task.goalId] = (placedGoalMinutes[unit.task.goalId] ?? 0) + unit.duration;
   }
 
   // ── 2. Ziel-Einheiten ──────────────────────────────────────
   if (options.includeGoals) {
+    const { planning } = data.settings;
     const progress = computeGoalProgress(data, days.map((d) => d.date), options.now);
     for (const goal of data.goals) {
       if (!goal.active || goal.target.type !== 'weeklyMinutes') continue;
@@ -130,6 +76,7 @@ export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
       let remaining = (p?.remainingMin ?? goal.target.minutes) - (placedGoalMinutes[goal.id] ?? 0);
       const sessionLen = goal.sessionMin > 0 ? goal.sessionMin : planning.defaultGoalSessionMin;
       let session = 1;
+      const usedDays = new Set<string>();
       while (remaining >= planning.minSlotMin && session <= days.length) {
         const duration = Math.min(sessionLen, remaining);
         const unit: Unit = {
@@ -143,12 +90,13 @@ export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
           score: 0,
           reasons: [`Ziel: noch ${formatHoursClock(remaining)} h diese Woche`],
         };
-        const result = placeUnit(data, planning, days, unit, today);
+        const result = placeUnit(data, days, unit, today, usedDays);
         if ('reason' in result) {
           unplanned.push({ goalId: goal.id, title: `${goal.title} (${formatDuration(remaining)} offen)`, reason: result.reason });
           break;
         }
-        items.push(commit(result, unit, planning));
+        items.push(commit(data, result, unit));
+        usedDays.add(result.day.date);
         remaining -= duration;
         session += 1;
       }
@@ -159,7 +107,7 @@ export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
   return {
     items,
     unplanned,
-    days: days.map((d) => ({ date: d.date, freeMin: d.freeMin, budgetMin: d.initialBudget, plannedMin: d.plannedMin })),
+    days: days.map((d) => ({ date: d.date, freeMin: d.freeMin, budgetMin: d.initialGeneralBudget, plannedMin: d.plannedMin })),
   };
 }
 
@@ -182,15 +130,7 @@ function taskUnit(task: Task, today: DateKey, fixedDate?: DateKey): Unit {
   };
 }
 
-function placeUnit(
-  data: PlannerData,
-  planning: PlanningSettings,
-  days: DayContext[],
-  unit: Unit,
-  today: DateKey,
-): Placement | { reason: string } {
-  const need = requiredEnergy(data, unit.energy);
-  const step = Math.max(planning.granularityMin, 15);
+function placeUnit(data: PlannerData, days: PlanningDay[], unit: Unit, today: DateKey, excludeDays?: Set<string>): Placement | { reason: string } {
   const overdue = !!unit.deadline && unit.deadline < today;
   let best: Placement | null = null;
   let budgetBlocked = false;
@@ -199,46 +139,22 @@ function placeUnit(
 
   for (const day of days) {
     if (unit.fixedDate && day.date !== unit.fixedDate) continue;
+    if (excludeDays?.has(day.date)) continue;
     if (unit.deadline && !overdue && day.date > unit.deadline) {
       afterDeadline = true;
       continue;
     }
-    if (unit.goal && day.goalSessions.has(unit.goal.id)) continue;
-    if (day.budget < unit.duration) {
+    if (day.generalBudget < unit.duration) {
       budgetBlocked = true;
       continue;
     }
-
-    for (const slot of day.slots) {
-      if (slot.end - slot.start < unit.duration) {
-        noSlot = true;
-        continue;
-      }
-      for (let start = slot.start; start + unit.duration <= slot.end; start += step) {
-        if (!focusAllows(day.focus, start, start + unit.duration, planning)) continue;
-        const energy = estimateEnergy(data, day.schedule, start);
-        const reasons: string[] = [];
-        let score = 0;
-
-        if (energy.level >= need) {
-          score += 20;
-          reasons.push(`Passt zu deiner Energie (${energy.level}/5)`);
-        } else {
-          score -= 25 * (need - energy.level);
-          reasons.push(`Energie evtl. knapp (${energy.level}/5)`);
-        }
-        if (unit.preferred) {
-          if (timeOfDayAt(start, planning) === unit.preferred) {
-            score += 15;
-            reasons.push(`Bevorzugt ${TIME_OF_DAY_LABEL[unit.preferred].toLowerCase()}`);
-          } else score -= 10;
-        }
-        score -= day.index * (unit.deadline ? 6 : 3); // frühere Tage bevorzugen
-        score -= (start - slot.start) / 60; // innerhalb einer Lücke lieber früh
-
-        if (!best || score > best.score) best = { day, start, score, energy, reasons };
-      }
+    const choice = bestSlotInDay(data, day, unit.duration, { energy: unit.energy, preferred: unit.preferred });
+    if (!choice) {
+      noSlot = true;
+      continue;
     }
+    const score = choice.score - day.index * (unit.deadline ? 6 : 3); // frühere Tage bevorzugen
+    if (!best || score > best.score) best = { day, start: choice.start, score, energy: choice.energy, reasons: choice.reasons };
   }
 
   if (best) return best;
@@ -248,42 +164,9 @@ function placeUnit(
   return { reason: 'Kein passender Zeitpunkt im Planungszeitraum gefunden.' };
 }
 
-/** Max. Fokuszeit am Stück: Aufgaben mit kleinerem Abstand als der Pausenlänge gelten als zusammenhängend. */
-function focusAllows(focus: TimeSlot[], start: number, end: number, planning: PlanningSettings): boolean {
-  const gap = planning.breakAfterFocusMin;
-  let chainStart = start;
-  let chainEnd = end;
-  let total = end - start;
-  const used = new Set<number>();
-  let changed = true;
-  while (changed) {
-    changed = false;
-    focus.forEach((f, i) => {
-      if (used.has(i)) return;
-      if (f.end > chainStart - gap && f.start < chainEnd + gap) {
-        used.add(i);
-        total += f.end - f.start;
-        chainStart = Math.min(chainStart, f.start);
-        chainEnd = Math.max(chainEnd, f.end);
-        changed = true;
-      }
-    });
-  }
-  return used.size === 0 || total <= planning.maxFocusMin;
-}
-
-function commit(p: Placement, unit: Unit, planning: PlanningSettings): PlanItem {
+function commit(data: PlannerData, p: Placement, unit: Unit): PlanItem {
   const { day, start } = p;
-  const end = start + unit.duration;
-  const buffer = planning.bufferBetweenTasksMin;
-  day.slots = subtractSlots(day.slots, [{ start: start - buffer, end: end + buffer }])
-    .map((s) => ({ start: roundUpTo(s.start, planning.granularityMin), end: s.end }))
-    .filter((s) => s.end - s.start >= planning.minSlotMin);
-  day.budget -= unit.duration;
-  day.plannedMin += unit.duration;
-  day.focus.push({ start, end });
-  if (unit.goal) day.goalSessions.add(unit.goal.id);
-
+  reserve(day, start, unit.duration, data.settings.planning);
   return {
     id: `${unit.key}@${day.date}`,
     kind: unit.kind,
@@ -292,7 +175,7 @@ function commit(p: Placement, unit: Unit, planning: PlanningSettings): PlanItem 
     title: unit.title,
     date: day.date,
     start,
-    end,
+    end: start + unit.duration,
     energy: unit.energy,
     estimatedEnergy: p.energy.level,
     reasons: [...unit.reasons, ...p.reasons],

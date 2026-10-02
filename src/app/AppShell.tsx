@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { SyncIndicator } from '../features/cloud/SyncIndicator';
+import { useCloud } from '../store/cloud';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../ui/cn';
 import { isActive, MOBILE_NAV, NAV_ITEMS } from './navigation';
@@ -22,6 +24,7 @@ export function Logo({ className }: { className?: string }) {
 
 export function AppShell({ route, children }: { route: RouteName; children: ReactNode }) {
   const name = useAppStore((s) => s.settings.profile.name);
+  const cloudOn = useCloud((s) => s.mode !== 'off');
 
   return (
     <div className="min-h-dvh lg:flex">
@@ -54,12 +57,21 @@ export function AppShell({ route, children }: { route: RouteName; children: Reac
           })}
         </nav>
         <div className="mt-auto px-2 text-[11px] leading-relaxed text-ink-faint">
-          Alle Daten bleiben lokal auf diesem Gerät.
+          {cloudOn ? <SyncIndicator /> : 'Alle Daten bleiben lokal auf diesem Gerät.'}
         </div>
       </aside>
 
       {/* Inhalt */}
       <main className="pt-safe min-w-0 flex-1">
+        {/* Mobil: schmale Leiste mit Sync-Status (nur wenn die Cloud eingerichtet ist) */}
+        {cloudOn && (
+          <div className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-bg/80 px-4 py-2 backdrop-blur-xl lg:hidden">
+            <span className="flex items-center gap-2 text-sm font-semibold">
+              <Logo className="h-5 w-5" /> LifeOS
+            </span>
+            <SyncIndicator />
+          </div>
+        )}
         <div className="mx-auto w-full max-w-6xl px-4 pt-6 pb-32 sm:px-6 lg:px-10 lg:pt-10 lg:pb-16">{children}</div>
       </main>
 

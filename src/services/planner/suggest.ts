@@ -1,10 +1,13 @@
 import { ENERGY_LABEL, TIME_OF_DAY_LABEL } from '../../domain/labels';
-import { formatDuration, minutesSinceMidnight, toDateKey, toHHMM, weekDays } from '../../domain/time';
+import { diffDays, formatDuration, minutesSinceMidnight, relativeDayLabel, toDateKey, toHHMM, weekDays } from '../../domain/time';
 import type { DateKey, DaySchedule, EnergyLevel, ScheduleBlock, Task, TaskEnergy } from '../../domain/types';
+import { studyProgress, studyWindow } from '../school/exams';
+import { deadlineMoment, homeworkOpenMinutes, isHomeworkOverdue } from '../school/homework';
+import { subjectById, subjectLabel } from '../school/timetable';
 import { energyFits, estimateEnergy, requiredEnergy } from './energy';
 import { timeOfDayAt } from './freeTime';
 import { computeGoalProgress } from './goals';
-import { buildDaySchedule } from './schedule';
+import { buildDaySchedule, WORK_KINDS } from './schedule';
 import { priorityScore, urgencyScore } from './scoring';
 import type { NowSuggestion, PlannerData, SuggestionItem } from './types';
 
@@ -45,27 +48,58 @@ export function suggestNow(data: PlannerData, now: Date): NowSuggestion {
   const busyNow = (m: number) => schedule.blocks.find((b) => b.blocksFreeTime && b.kind !== 'sleep' && b.start <= m && m < b.end);
   const currentBlock = busyNow(nowMin);
   const currentTask = currentBlock?.kind === 'task' ? data.tasks.find((t) => t.id === currentBlock.sourceId) : undefined;
+  const currentHomework = currentBlock?.kind === 'homework' ? data.homework.find((h) => h.id === currentBlock.sourceId) : undefined;
+  const currentExam = currentBlock?.kind === 'study' ? data.exams.find((e) => e.id === currentBlock.sourceId) : undefined;
+  const plannedWorkNow = !!(currentTask || currentHomework || currentExam);
 
   let fromMinute = nowMin;
-  if (currentBlock && !currentTask) {
+  if (currentBlock && !plannedWorkNow) {
     let guard = 0;
     let block: ScheduleBlock | undefined = currentBlock;
-    while (block && block.kind !== 'task' && guard++ < 20) {
+    while (block && !WORK_KINDS.includes(block.kind) && guard++ < 20) {
       fromMinute = block.end;
       block = busyNow(fromMinute);
     }
   }
 
   const nextBlock = schedule.blocks
-    .filter((b) => b.blocksFreeTime && b.kind !== 'sleep' && b.kind !== 'task' && b.start >= fromMinute)
+    .filter((b) => b.blocksFreeTime && b.kind !== 'sleep' && !WORK_KINDS.includes(b.kind) && b.start >= fromMinute)
     .sort((a, b) => a.start - b.start)[0];
   const untilMin = Math.min(nextBlock?.start ?? schedule.awake.end, schedule.awake.end);
   const availableMin = Math.max(0, untilMin - fromMinute);
   const energy = estimateEnergy(data, schedule, fromMinute);
 
   const lines: string[] = [];
-  if (currentBlock && !currentTask) {
+  if (currentBlock && !plannedWorkNow) {
     lines.push(`Gerade: ${currentBlock.title} bis ${toHHMM(currentBlock.end)}. Frei ab ${toHHMM(fromMinute)}:`);
+  }
+
+  // ── Laut Plan läuft gerade eine Hausaufgabe oder Lerneinheit ─
+  const plannedSchoolWork = (currentHomework && currentHomework.status !== 'done') || (currentExam && !currentBlock?.done);
+  if (currentBlock && plannedSchoolWork) {
+    return {
+      mode: 'tasks',
+      headline: `Laut Plan: ${currentBlock.title}`,
+      lines: [`Eingeplant bis ${toHHMM(currentBlock.end)}.`, energyLine(energy.level)],
+      energy,
+      fromMinute: nowMin,
+      availableMin: currentBlock.end - nowMin,
+      currentBlock,
+      nextBlock,
+      items: [
+        {
+          key: `${currentBlock.sourceKey}:${currentBlock.itemId ?? ''}`,
+          homework: currentHomework,
+          exam: currentExam,
+          blockId: currentBlock.itemId,
+          title: currentBlock.title,
+          minutes: currentBlock.end - nowMin,
+          partial: false,
+          reasons: ['Steht jetzt in deinem Tagesplan'],
+        },
+      ],
+      laterForEnergy: [],
+    };
   }
   lines.push(availabilityLine(availableMin, nextBlock, untilMin, schedule));
   lines.push(energyLine(energy.level));
@@ -107,6 +141,51 @@ export function suggestNow(data: PlannerData, now: Date): NowSuggestion {
       continue;
     }
     candidates.push(item);
+  }
+
+  // Hausaufgaben: Deadline-gebunden, daher deutlich wichtiger als freiwillige Ziele.
+  for (const hw of data.homework) {
+    const open = homeworkOpenMinutes(hw);
+    if (open < 5) continue;
+    const label = subjectLabel(subjectById(data, hw.subjectId));
+    const due = deadlineMoment(hw.deadline);
+    const daysLeft = diffDays(today, due.date);
+    const urgency = isHomeworkOverdue(hw, now) ? 100 : daysLeft <= 1 ? 90 : daysLeft <= 2 ? 70 : 45;
+    const reasons = [
+      isHomeworkOverdue(hw, now) ? 'Hausaufgabe überfällig' : daysLeft <= 1 ? 'Hausaufgabe für morgen' : `Hausaufgabe bis ${relativeDayLabel(due.date, today)}`,
+      priorityScore(hw.priority).reason,
+    ].filter((r): r is string => !!r);
+    const item = { key: `homework:${hw.id}`, homework: hw, title: `${label.name}: ${hw.title || 'Hausaufgabe'}`, minutes: open, partial: false, reasons };
+    if (!energyFits(data, hw.energy, energy.level)) {
+      laterForEnergy.push({ ...item, reasons: [`Braucht ${NEED_WORD[hw.energy]} Energie (ab ${requiredEnergy(data, hw.energy)}/5)`] });
+      continue;
+    }
+    candidates.push({ ...item, score: urgency + priorityScore(hw.priority).points });
+  }
+
+  // Lernzeit für anstehende Tests (innerhalb des Lernzeitraums).
+  for (const exam of data.exams) {
+    const window = studyWindow(data, exam, today);
+    if (!window || today < window.from || exam.desiredStudyMinutes <= 0) continue;
+    const progress = studyProgress(exam, now);
+    const open = progress.targetMin - progress.doneMin;
+    if (open < 10) continue;
+    const label = subjectLabel(subjectById(data, exam.subjectId));
+    const daysLeft = diffDays(today, exam.date);
+    const minutes = Math.min(open, exam.sessionMinutes ?? data.settings.school.defaultStudySessionMin);
+    const item = {
+      key: `exam:${exam.id}`,
+      exam,
+      title: `Lernen: ${label.name} · ${exam.title}`,
+      minutes,
+      partial: false,
+      reasons: [daysLeft <= 1 ? 'Test morgen' : `Test in ${daysLeft} Tagen`, `${formatDuration(progress.doneMin)} von ${formatDuration(progress.targetMin)} gelernt`],
+    };
+    if (!energyFits(data, exam.energy, energy.level)) {
+      laterForEnergy.push({ ...item, reasons: [`Braucht ${NEED_WORD[exam.energy]} Energie (ab ${requiredEnergy(data, exam.energy)}/5)`] });
+      continue;
+    }
+    candidates.push({ ...item, score: (daysLeft <= 1 ? 85 : daysLeft <= 3 ? 60 : daysLeft <= 7 ? 40 : 25) + priorityScore(exam.priority).points / 2 });
   }
 
   // Ziele, die diese Woche hinterherhinken, als zusätzliche Kandidaten.

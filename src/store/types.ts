@@ -10,26 +10,42 @@ import type {
   EnergyLevel,
   EnergySettings,
   EnergyTimeWindow,
+  Exam,
   Goal,
+  Homework,
   ID,
   Meal,
   PlanningSettings,
   Routine,
+  SchoolBlock,
+  SchoolSettings,
   Settings,
   SleepSettings,
   SleepTimes,
   SourceKey,
   SpecialDay,
+  Subject,
   Task,
   TaskSchedule,
+  TimetableEntry,
   UiSettings,
   UserProfile,
   Vacation,
   Weekday,
   WorkWindow,
 } from '../domain/types';
-import type { EventInput, GoalInput, RoutineInput, TaskInput } from '../domain/factories';
+import type {
+  EventInput,
+  ExamInput,
+  GoalInput,
+  HomeworkInput,
+  RoutineInput,
+  SubjectInput,
+  TaskInput,
+  TimetableEntryInput,
+} from '../domain/factories';
 import type { PlanItem } from '../services/planner/types';
+import type { SchoolPlanResult } from '../services/school/types';
 
 /** Alles, was persistiert wird. */
 export interface AppData {
@@ -41,6 +57,37 @@ export interface AppData {
   dailyStates: Record<DateKey, DailyState>;
   vacations: Vacation[];
   specialDays: SpecialDay[];
+  subjects: Subject[];
+  timetable: TimetableEntry[];
+  homework: Homework[];
+  exams: Exam[];
+}
+
+export type BlockOwner = { kind: 'homework'; id: ID } | { kind: 'exam'; id: ID };
+
+export interface SchoolActions {
+  updateSchoolSettings(patch: Partial<SchoolSettings>): void;
+  addSubject(input: SubjectInput): ID;
+  updateSubject(id: ID, patch: Partial<SubjectInput>): void;
+  /** Entfernt das Fach samt Stundenplan-Einträgen. Hausaufgaben/Tests bleiben erhalten. */
+  removeSubject(id: ID): void;
+  addLesson(input: TimetableEntryInput): ID;
+  updateLesson(id: ID, patch: Partial<TimetableEntryInput>): void;
+  removeLesson(id: ID): void;
+  addHomework(input: HomeworkInput): ID;
+  updateHomework(id: ID, patch: Partial<HomeworkInput>): void;
+  removeHomework(id: ID): void;
+  toggleHomeworkDone(id: ID): void;
+  addExam(input: ExamInput): ID;
+  updateExam(id: ID, patch: Partial<ExamInput>): void;
+  removeExam(id: ID): void;
+  /** Block einer Hausaufgabe bzw. Lerneinheit eines Tests ändern (wird dadurch "manuell"). */
+  updateSchoolBlock(owner: BlockOwner, blockId: ID, patch: Partial<Omit<SchoolBlock, 'id'>>): void;
+  addSchoolBlock(owner: BlockOwner, block: Omit<SchoolBlock, 'id'>): void;
+  removeSchoolBlock(owner: BlockOwner, blockId: ID): void;
+  toggleSchoolBlockDone(owner: BlockOwner, blockId: ID): void;
+  /** Ergebnis der automatischen Schulplanung übernehmen. */
+  applySchoolPlan(result: SchoolPlanResult): void;
 }
 
 export interface SettingsActions {
@@ -114,6 +161,8 @@ export interface DailyActions {
   addSpecialDay(d: SpecialDay): void;
   updateSpecialDay(id: ID, patch: Partial<SpecialDay>): void;
   removeSpecialDay(id: ID): void;
+  /** Hausaufgaben-Nachfrage für einen Tag als erledigt markieren oder vertagen. */
+  setHomeworkPrompt(date: DateKey, status: 'done' | 'snoozed', until?: string): void;
 }
 
 export interface DataActions {
@@ -121,6 +170,8 @@ export interface DataActions {
   exportData(): string;
   importData(json: string): { ok: true } | { ok: false; error: string };
   resetAll(): void;
+  /** Ersetzt alle Daten (z. B. durch Cloud-Daten). Wird von der Synchronisierung genutzt. */
+  replaceData(data: AppData): void;
 }
 
 export type AppState = AppData &
@@ -130,6 +181,7 @@ export type AppState = AppData &
   TaskActions &
   GoalActions &
   DailyActions &
+  SchoolActions &
   DataActions;
 
 export type SliceCreator<T> = StateCreator<AppState, [['zustand/persist', unknown]], [], T>;

@@ -138,6 +138,8 @@ export interface DayStateDefinition {
   sourceRules: Record<SourceKey, boolean>;
   /** Optionale Energie-Obergrenze, z. B. Krank → max. 2. */
   energyCap?: EnergyLevel;
+  /** Optional: An solchen Tagen höchstens diesen Anteil der freien Zeit verplanen (0–1), z. B. Krank → 0,3. */
+  maxPlannedShare?: number;
   /** Hinweis, der in der Tagesansicht angezeigt wird. */
   message?: string;
 }
@@ -180,6 +182,46 @@ export interface UiSettings {
   weekStartsOn: Weekday;
 }
 
+export interface SchoolSettings {
+  enabled: boolean;
+  /**
+   * Routine, deren Zeiten an Tagen mit Stundenplan aus dem Stundenplan kommen (z. B. "Schule").
+   * Weg, Pausen-, Zustands- und Energie-Regeln dieser Routine gelten dann für die Schulzeit weiter.
+   */
+  linkedRoutineId?: ID;
+  /** Kategorie der Schulzeit, wenn keine Routine verknüpft ist (für Zustands-, Pausen- und Energie-Regeln). */
+  categoryId: ID;
+  /** Schulweg, wenn keine Routine verknüpft ist. */
+  travelBeforeMin: number;
+  travelAfterMin: number;
+  /** Kategorie für Hausaufgaben- und Lernblöcke. */
+  workCategoryId: ID;
+  /** Durchschnittliche Hausaufgabenzeit – Standard für neue Hausaufgaben. */
+  defaultHomeworkMinutes: number;
+  defaultHomeworkPriority: Priority;
+  /** Nach Schulschluss nach neuen Hausaufgaben fragen. */
+  askForHomework: boolean;
+  /** Hausaufgaben und Lernzeit automatisch in freie Zeit einplanen. */
+  autoPlan: boolean;
+  /** Hausaufgaben dürfen auf mehrere Blöcke verteilt werden. */
+  allowSplitHomework: boolean;
+  /** Kleinster sinnvoller Arbeitsblock. */
+  minBlockMin: number;
+  /** Anteil der freien Zeit, den Schulaufgaben höchstens belegen dürfen (statt des allgemeinen Planungsanteils). */
+  maxSchoolShare: number;
+  /** Wird kein nächster Unterricht gefunden: Deadline nach so vielen Tagen. */
+  fallbackDeadlineDays: number;
+  /** So weit im Voraus wird nach der nächsten Stunde eines Fachs gesucht. */
+  lookaheadDays: number;
+  /** Standard für neue Tests. */
+  defaultStudyMinutes: number;
+  /** So viele Tage vor einem Test beginnt die Lernzeit (wenn kein eigener Start gesetzt ist). */
+  defaultStudyLeadDays: number;
+  defaultStudySessionMin: number;
+  /** Höchstens so viel Lernzeit pro Tag und Test. */
+  maxStudyMinPerDay: number;
+}
+
 export interface Settings {
   profile: UserProfile;
   onboardingDone: boolean;
@@ -190,6 +232,7 @@ export interface Settings {
   dayStates: DayStateDefinition[];
   categories: Category[];
   planning: PlanningSettings;
+  school: SchoolSettings;
   ui: UiSettings;
 }
 
@@ -303,6 +346,105 @@ export interface Goal {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Schule: Fächer, Stundenplan, Hausaufgaben, Tests
+// ─────────────────────────────────────────────────────────────
+
+export interface Subject {
+  id: ID;
+  name: string;
+  /** Kurzform für kompakte Anzeigen, z. B. "Ma". */
+  shortName?: string;
+  color: string;
+  teacher?: string;
+  room?: string;
+  /**
+   * Optionale Ø-Hausaufgabenzeit für dieses Fach – überschreibt den allgemeinen Standard.
+   * (Vorbereitet, um später Durchschnittswerte pro Fach automatisch zu lernen.)
+   */
+  homeworkMinutes?: number;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+}
+
+export interface TimetableEntry {
+  id: ID;
+  subjectId: ID;
+  weekday: Weekday;
+  start: TimeHHMM;
+  end: TimeHHMM;
+  teacher?: string;
+  room?: string;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+}
+
+/** Geplanter Arbeitsblock für eine Hausaufgabe bzw. Lerneinheit für einen Test. */
+export interface SchoolBlock {
+  id: ID;
+  date: DateKey;
+  start: TimeHHMM;
+  durationMin: number;
+  /** auto = vom Planer gesetzt, manual = vom Nutzer gesetzt oder verschoben (wird nie automatisch bewegt). */
+  source: 'auto' | 'manual';
+  done: boolean;
+}
+
+/** Lerneinheit für einen Test. */
+export type StudySession = SchoolBlock;
+
+export interface HomeworkDeadline {
+  date: DateKey;
+  /** Beginn der Stunde, vor der die Hausaufgabe fertig sein muss. */
+  time?: TimeHHMM;
+  /** nextLesson = aus dem Stundenplan, fallback = keine Stunde gefunden, manual = selbst gesetzt */
+  source: 'nextLesson' | 'fallback' | 'manual';
+}
+
+export interface Homework {
+  id: ID;
+  subjectId: ID;
+  /** Aufgabe, z. B. "S. 43 Nr. 3–7". */
+  title: string;
+  description?: string;
+  note?: string;
+  estimatedMinutes: number;
+  priority: Priority;
+  energy: TaskEnergy;
+  /** Tag, an dem die Hausaufgabe aufgegeben wurde. */
+  assignedDate: DateKey;
+  deadline: HomeworkDeadline;
+  status: TaskStatus;
+  plannedBlocks: SchoolBlock[];
+  completedAt?: ISODateTime;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+}
+
+export interface Exam {
+  id: ID;
+  subjectId: ID;
+  /** z. B. "Klassenarbeit", "Vokabeltest". */
+  title: string;
+  date: DateKey;
+  startTime?: TimeHHMM;
+  endTime?: TimeHHMM;
+  room?: string;
+  notes?: string;
+  priority: Priority;
+  energy: TaskEnergy;
+  /** Gewünschte Lernzeit insgesamt in Minuten (0 = kein Lernplan). */
+  desiredStudyMinutes: number;
+  /** Lernbeginn – sonst gilt der Standard-Vorlauf aus den Einstellungen. */
+  studyStartDate?: DateKey;
+  /** Bevorzugte Länge einer Lerneinheit. */
+  sessionMinutes?: number;
+  preferredTimeOfDay?: TimeOfDay;
+  studySessions: StudySession[];
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Tageszustand, Urlaub, besondere Tage
 // ─────────────────────────────────────────────────────────────
 
@@ -316,6 +458,8 @@ export interface DailyState {
   /** Einzelne Quellen nur heute auslassen (z. B. "Fußball fällt aus"). */
   skippedSources: SourceKey[];
   note?: string;
+  /** Nachfrage "Welche Hausaufgaben hast du heute bekommen?" – beantwortet oder vertagt. */
+  homeworkPrompt?: { status: 'done' | 'snoozed'; until?: ISODateTime };
 }
 
 export interface Vacation {
@@ -339,7 +483,30 @@ export interface SpecialDay {
 // Berechnete Strukturen (werden nicht gespeichert)
 // ─────────────────────────────────────────────────────────────
 
-export type BlockKind = 'sleep' | 'meal' | 'routine' | 'event' | 'travel' | 'break' | 'task';
+export type BlockKind =
+  | 'sleep'
+  | 'meal'
+  | 'routine'
+  | 'event'
+  | 'travel'
+  | 'break'
+  | 'task'
+  | 'school'
+  | 'homework'
+  | 'study'
+  | 'exam';
+
+/** Eine Unterrichtsstunde innerhalb eines Schul-Blocks. */
+export interface LessonInfo {
+  entryId: ID;
+  subjectId: ID;
+  title: string;
+  shortName: string;
+  color: string;
+  start: number;
+  end: number;
+  room?: string;
+}
 
 export interface ScheduleBlock {
   /** Deterministische ID: `${sourceKey}@${date}` (+ Suffix). */
@@ -362,6 +529,12 @@ export interface ScheduleBlock {
   relatedTo?: string;
   /** Kann (nur für heute) ausgelassen werden. */
   skippable: boolean;
+  /** ID eines Unterelements, z. B. des Hausaufgaben- oder Lernblocks. */
+  itemId?: ID;
+  /** Erledigt (für Arbeitsblöcke wie Hausaufgaben und Lerneinheiten). */
+  done?: boolean;
+  /** Unterrichtsstunden innerhalb eines Schul-Blocks. */
+  lessons?: LessonInfo[];
 }
 
 export interface TimeSlot {
@@ -395,6 +568,10 @@ export interface DaySchedule {
   blocks: ScheduleBlock[];
   /** Ganztägige Termine (blockieren keine Uhrzeit). */
   allDayEvents: CalendarEvent[];
+  /** Unterricht an diesem Tag (leer, wenn die Schule pausiert ist). */
+  lessons: LessonInfo[];
+  /** Tests an diesem Tag (auch ohne Uhrzeit). */
+  exams: Exam[];
   /** Ausgelassene Quellen (pausiert durch Zustand oder manuell). */
   inactive: Array<{ sourceKey: SourceKey; title: string; reason: 'state' | 'skipped' }>;
   freeSlots: TimeSlot[];

@@ -1,11 +1,19 @@
-import { AlarmClock, CalendarClock, Moon, Pause, Play, Sparkles, Undo2 } from 'lucide-react';
+import { AlarmClock, CalendarClock, ClipboardList, Moon, Pause, Play, Sparkles, Undo2 } from 'lucide-react';
 import { formatDuration, toHHMM } from '../../domain/time';
-import type { DateKey, DaySchedule, ScheduleBlock, Task, TimeSlot } from '../../domain/types';
+import type { DateKey, DaySchedule, ID, ScheduleBlock, Task, TimeSlot } from '../../domain/types';
+import { subjectById, subjectLabel } from '../../services/school/timetable';
+import type { BlockOwner } from '../../store/types';
 import { useAppStore } from '../../store/useAppStore';
 import { Card, CardHeader } from '../../ui/Card';
 import { alpha, cn } from '../../ui/cn';
 import { BLOCK_ICON } from '../shared/blockMeta';
 import { TaskCheckbox } from '../tasks/TaskItem';
+
+/** Hausaufgaben-/Lernblock → Besitzer (Hausaufgabe oder Test) + Block-ID. */
+function schoolWorkOf(b: ScheduleBlock): { owner: BlockOwner; blockId: ID } | undefined {
+  if ((b.kind !== 'homework' && b.kind !== 'study') || !b.sourceId || !b.itemId) return undefined;
+  return { owner: { kind: b.kind === 'homework' ? 'homework' : 'exam', id: b.sourceId }, blockId: b.itemId };
+}
 
 type Entry =
   | { type: 'block'; start: number; block: ScheduleBlock }
@@ -21,12 +29,16 @@ interface TimelineProps {
   nowMin: number;
   onPlan: () => void;
   onOpenTask: (task: Task) => void;
+  onOpenBlock: (owner: BlockOwner, blockId: ID) => void;
 }
 
-export function Timeline({ schedule, date, today, nowMin, onPlan, onOpenTask }: TimelineProps) {
+export function Timeline({ schedule, date, today, nowMin, onPlan, onOpenTask, onOpenBlock }: TimelineProps) {
   const tasks = useAppStore((s) => s.tasks);
+  const subjects = useAppStore((s) => s.subjects);
   const toggleSkipSource = useAppStore((s) => s.toggleSkipSource);
   const toggleTaskDone = useAppStore((s) => s.toggleTaskDone);
+  const toggleSchoolBlockDone = useAppStore((s) => s.toggleSchoolBlockDone);
+  const allDayExams = schedule.exams.filter((e) => !e.startTime);
   const minSlot = useAppStore((s) => s.settings.planning.minSlotMin);
   const isToday = date === today;
   const editable = date >= today;
@@ -52,13 +64,21 @@ export function Timeline({ schedule, date, today, nowMin, onPlan, onOpenTask }: 
     <Card>
       <CardHeader title="Tagesablauf" icon={CalendarClock} subtitle={`${toHHMM(schedule.awake.start)} – ${toHHMM(schedule.awake.end)}`} />
 
-      {schedule.allDayEvents.length > 0 && (
+      {(schedule.allDayEvents.length > 0 || allDayExams.length > 0) && (
         <div className="mb-3 flex flex-wrap gap-2">
           {schedule.allDayEvents.map((e) => (
             <span key={e.id} className="rounded-full bg-white/5 px-3 py-1 text-xs">
               Ganztägig · {e.title}
             </span>
           ))}
+          {allDayExams.map((e) => {
+            const label = subjectLabel(subjectById({ subjects }, e.subjectId));
+            return (
+              <span key={e.id} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs" style={{ background: alpha(label.color, 0.14), color: label.color }}>
+                <ClipboardList size={12} /> Heute: {label.name} · {e.title}
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -114,7 +134,10 @@ export function Timeline({ schedule, date, today, nowMin, onPlan, onOpenTask }: 
           const past = isToday && b.end <= nowMin;
           const current = isToday && b.start <= nowMin && nowMin < b.end;
           const task = b.kind === 'task' ? tasks.find((t) => t.id === b.sourceId) : undefined;
+          const work = schoolWorkOf(b);
           const subtle = b.kind === 'travel' || b.kind === 'break';
+          const clickable = !!task || !!work;
+          const isDone = task ? task.status === 'done' : !!b.done;
 
           if (subtle) {
             return (
@@ -141,26 +164,43 @@ export function Timeline({ schedule, date, today, nowMin, onPlan, onOpenTask }: 
               <span className={cn('w-11 shrink-0 pt-3 text-right text-xs tabular', current ? 'font-semibold text-ink' : 'text-ink-muted')}>{toHHMM(b.start)}</span>
               <span className="mt-4 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: b.color }} />
               <div
-                role={task ? 'button' : undefined}
-                onClick={task ? () => onOpenTask(task) : undefined}
+                role={clickable ? 'button' : undefined}
+                onClick={task ? () => onOpenTask(task) : work ? () => onOpenBlock(work.owner, work.blockId) : undefined}
                 className={cn(
                   'flex min-w-0 flex-1 items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors',
-                  task && 'cursor-pointer hover:brightness-125',
+                  clickable && 'cursor-pointer hover:brightness-125',
                   current && 'ring-1 ring-white/25',
                 )}
                 style={{ background: alpha(b.color, current ? 0.16 : 0.08), borderColor: alpha(b.color, 0.2) }}
               >
                 {task ? (
                   <TaskCheckbox done={task.status === 'done'} onToggle={() => toggleTaskDone(task.id)} color={b.color} />
+                ) : work ? (
+                  <TaskCheckbox done={isDone} onToggle={() => toggleSchoolBlockDone(work.owner, work.blockId)} color={b.color} />
                 ) : (
                   <Icon size={16} className="shrink-0" style={{ color: b.color }} />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className={cn('truncate text-sm font-medium', task?.status === 'done' && 'text-ink-faint line-through')}>{b.title}</div>
+                  <div className={cn('truncate text-sm font-medium', isDone && 'text-ink-faint line-through')}>{b.title}</div>
                   <div className="text-[11px] text-ink-muted tabular">
                     {toHHMM(b.start)}–{toHHMM(b.end)} · {formatDuration(b.end - b.start)}
                     {!b.blocksFreeTime && ' · flexibel'}
+                    {b.kind === 'exam' && ' · Test'}
                   </div>
+                  {b.lessons && b.lessons.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {b.lessons.map((l) => (
+                        <span
+                          key={l.entryId}
+                          title={`${l.title} ${toHHMM(l.start)}–${toHHMM(l.end)}`}
+                          className={cn('rounded-md px-1.5 py-0.5 text-[10px] font-semibold', isToday && l.end <= nowMin && 'opacity-50')}
+                          style={{ background: alpha(l.color, 0.2), color: l.color }}
+                        >
+                          {l.shortName}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {current && <span className="hidden shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium sm:inline">Läuft</span>}
                 {b.skippable && editable && (

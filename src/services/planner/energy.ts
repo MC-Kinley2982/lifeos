@@ -27,7 +27,7 @@ export function estimateEnergy(data: PlannerData, schedule: DaySchedule, minute:
     reason = window.label;
   }
 
-  const activities = schedule.blocks.filter((b) => (b.kind === 'routine' || b.kind === 'event') && b.categoryId);
+  const activities = schedule.blocks.filter((b) => (b.kind === 'routine' || b.kind === 'school' || b.kind === 'event') && b.categoryId);
   const current = activities.find((b) => b.start <= minute && minute < b.end);
   const duringRule = current && energy.categoryRules.find((r) => r.categoryId === current.categoryId && r.duringLevel);
 

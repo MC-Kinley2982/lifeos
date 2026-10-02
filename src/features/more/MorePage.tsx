@@ -1,12 +1,12 @@
 import { ChevronRight } from 'lucide-react';
 import { hrefFor } from '../../app/router';
-import { NAV_ITEMS } from '../../app/navigation';
+import { MORE_ROUTES, NAV_ITEMS } from '../../app/navigation';
 import { PageHeader } from '../../ui/Card';
 import { cn } from '../../ui/cn';
 
 /** Mobile "Mehr"-Seite für Bereiche, die nicht in der Bottom-Navigation sind. */
 export function MorePage() {
-  const items = NAV_ITEMS.filter((i) => ['events', 'routines', 'settings'].includes(i.route));
+  const items = NAV_ITEMS.filter((i) => MORE_ROUTES.includes(i.route));
   return (
     <div className="animate-fade-in">
       <PageHeader title="Mehr" />

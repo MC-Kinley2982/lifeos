@@ -2,14 +2,20 @@ import { useMemo, useState } from 'react';
 import { ChevronRight, Sparkles, Target } from 'lucide-react';
 import { hrefFor, PATHS } from '../../app/router';
 import { formatDateShort, minutesSinceMidnight, toDateKey } from '../../domain/time';
-import type { DateKey, Task } from '../../domain/types';
+import type { DateKey, Exam, Homework, ID, Task } from '../../domain/types';
 import { useDaySchedule, useEnergy, useGoalProgress, useNow } from '../../store/hooks';
+import type { BlockOwner } from '../../store/types';
 import { useAppStore } from '../../store/useAppStore';
 import { Card, CardHeader } from '../../ui/Card';
 import { alpha } from '../../ui/cn';
 import { DynamicIcon } from '../../ui/icons';
 import { GoalProgressRow } from '../goals/GoalProgressRow';
 import { AutoPlanSheet } from '../planning/AutoPlanSheet';
+import { BlockEditSheet } from '../school/BlockEditSheet';
+import { ExamForm } from '../school/ExamForm';
+import { HomeworkCaptureSheet } from '../school/HomeworkCaptureSheet';
+import { HomeworkForm } from '../school/HomeworkForm';
+import { SchoolTodayCard } from '../school/SchoolTodayCard';
 import { TaskForm } from '../tasks/TaskForm';
 import { DayHeader } from './DayHeader';
 import { DayStateSheet } from './DayStateSheet';
@@ -39,6 +45,13 @@ export function TodayPage({ dateParam }: { dateParam?: string }) {
 
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [school, setSchool] = useState<
+    | { kind: 'block'; owner: BlockOwner; blockId: ID }
+    | { kind: 'capture' }
+    | { kind: 'homework'; hw: Homework }
+    | { kind: 'exam'; exam: Exam }
+    | null
+  >(null);
 
   const fromMinute = isToday ? nowMin : 0;
   const freeMin = schedule.freeSlots.reduce((sum, s) => sum + Math.max(0, s.end - Math.max(s.start, fromMinute)), 0);
@@ -99,16 +112,34 @@ export function TodayPage({ dateParam }: { dateParam?: string }) {
       )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] lg:items-start">
-        <div className="order-2 lg:order-none lg:row-span-3">
-          <Timeline schedule={schedule} date={date} today={today} nowMin={nowMin} onPlan={() => setSheet('plan')} onOpenTask={setEditing} />
+        <div className="order-3 lg:order-none lg:row-span-4">
+          <Timeline
+            schedule={schedule}
+            date={date}
+            today={today}
+            nowMin={nowMin}
+            onPlan={() => setSheet('plan')}
+            onOpenTask={setEditing}
+            onOpenBlock={(owner, blockId) => setSchool({ kind: 'block', owner, blockId })}
+          />
         </div>
         <div className="order-1 lg:order-none">
           <TodayTasks date={date} today={today} onOpenTask={setEditing} />
         </div>
-        <div className="order-3 lg:order-none">
-          <FreeTimeCard schedule={schedule} fromMinute={fromMinute} editable={date >= today} onPlan={() => setSheet('plan')} />
+        <div className="order-2 empty:hidden lg:order-none">
+          <SchoolTodayCard
+            date={date}
+            now={now}
+            schedule={schedule}
+            onCapture={() => setSchool({ kind: 'capture' })}
+            onOpenHomework={(hw) => setSchool({ kind: 'homework', hw })}
+            onOpenExam={(exam) => setSchool({ kind: 'exam', exam })}
+          />
         </div>
         <div className="order-4 lg:order-none">
+          <FreeTimeCard schedule={schedule} fromMinute={fromMinute} editable={date >= today} onPlan={() => setSheet('plan')} />
+        </div>
+        <div className="order-5 lg:order-none">
           <Card>
             <CardHeader
               title="Ziele diese Woche"
@@ -139,6 +170,10 @@ export function TodayPage({ dateParam }: { dateParam?: string }) {
       {sheet === 'state' && <DayStateSheet date={date} onClose={() => setSheet(null)} />}
       {sheet === 'energy' && <EnergySheet date={date} energy={energy} onClose={() => setSheet(null)} />}
       {editing && <TaskForm task={editing} onClose={() => setEditing(null)} />}
+      {school?.kind === 'block' && <BlockEditSheet owner={school.owner} blockId={school.blockId} onClose={() => setSchool(null)} />}
+      {school?.kind === 'capture' && <HomeworkCaptureSheet mode="manual" date={date} onClose={() => setSchool(null)} />}
+      {school?.kind === 'homework' && <HomeworkForm homework={school.hw} onClose={() => setSchool(null)} />}
+      {school?.kind === 'exam' && <ExamForm exam={school.exam} onClose={() => setSchool(null)} />}
     </div>
   );
 }
