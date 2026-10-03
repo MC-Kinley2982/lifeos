@@ -1,7 +1,17 @@
 import { createId } from '../../domain/ids';
 import { addDays, formatDuration, toDateKey, toHHMM } from '../../domain/time';
 import type { DateKey, Exam, Homework, ID, Priority, SchoolBlock, TaskEnergy, TimeOfDay } from '../../domain/types';
-import { bestSlotInDay, buildPlanningDays, reserve, type PlanningDay } from '../planner/placement';
+import {
+  balanceFromRemaining,
+  balanceScore,
+  bestSlotInDay,
+  buildPlanningDays,
+  dayHasActivity,
+  freeBefore,
+  reserve,
+  type Activity,
+  type PlanningDay,
+} from '../planner/placement';
 import type { PlannerData } from '../planner/types';
 import { studyWindow } from './exams';
 import { deadlineMoment, doneMinutes, isBlockUpcoming, isHomeworkOverdue, upcomingMinutes } from './homework';
@@ -11,6 +21,8 @@ import type { SchoolPlanOptions, SchoolPlanResult } from './types';
 /** So weit voraus wird höchstens geplant. */
 const HORIZON_DAYS = 28;
 const STEP = 5;
+/** Abzug für den Abgabetag selbst – lieber vorher erledigen, als alles auf den letzten Moment zu schieben. */
+const DUE_DAY_PENALTY = 25;
 
 const PRIORITY_RANK: Record<Priority, number> = { urgent: 3, high: 2, medium: 1, low: 0 };
 
@@ -21,15 +33,23 @@ interface WorkUnit {
   /** Spätestes Ende: Datum + Minute (Hausaufgabe: Beginn der Stunde; Test: Vortag). */
   dueDate: DateKey;
   dueMinute: number;
+  /** Frühester Tag (Lernbeginn bei Tests). */
+  fromDate?: DateKey;
   rank: number;
   remaining: number;
   total: number;
   energy: TaskEnergy;
   preferred?: TimeOfDay;
   overBudget: boolean;
+  activity: Activity;
   exam?: Exam;
-  /** Frühester Tag (Lernbeginn bei Tests). */
-  fromDate?: DateKey;
+}
+
+interface Pick {
+  day: PlanningDay;
+  start: number;
+  len: number;
+  score: number;
 }
 
 /**
@@ -39,9 +59,11 @@ interface WorkUnit {
  * 1. Verpasste Blöcke (vergangen, nicht erledigt) werden entfernt – die Restzeit wird neu geplant.
  * 2. Manuelle Blöcke werden nie verschoben; kommende Blöcke bleiben stabil.
  * 3. Reihenfolge: früheste Deadline zuerst (Hausaufgaben vor Tests am selben Tag), dann Priorität.
- * 4. Hausaufgaben: möglichst früh und am Stück, sonst aufgeteilt (≥ Mindestblock) – immer vor der Deadline.
- * 5. Tests: Lernzeit gleichmäßig über den Lernzeitraum verteilt (max. eine Einheit pro Tag und Test).
- * 6. Freizeit-Schutz: Schulaufgaben dürfen höchstens den Schul-Anteil der freien Zeit belegen.
+ * 4. Pro Tag höchstens ein Block derselben Hausaufgabe bzw. eine Lerneinheit pro Test.
+ * 5. Hausaufgaben möglichst am Stück, sonst auf mehrere Tage verteilt – immer vor der Deadline,
+ *    bevorzugt an Tagen mit viel freier Zeit und nicht erst am Abgabetag.
+ * 6. Tests: Lernzeit auf mehrere Tage im Lernzeitraum verteilt, freie Tage zuerst.
+ * 7. Freizeit-Schutz: höchstens der Schul-Anteil der freien Zeit, Mindest-Freizeit bleibt immer frei.
  */
 export function planSchoolWork(data: PlannerData, now: Date, opts: SchoolPlanOptions = {}): SchoolPlanResult {
   const result: SchoolPlanResult = { homework: {}, exams: {}, added: [], unplanned: [] };
@@ -78,8 +100,7 @@ export function planSchoolWork(data: PlannerData, now: Date, opts: SchoolPlanOpt
     if (h.status === 'done' || !hwSelected(h.id)) continue;
     const remaining = h.estimatedMinutes - doneMinutes(h.plannedBlocks) - upcomingMinutes(h.plannedBlocks, now);
     if (remaining < STEP) continue;
-    const overdue = isHomeworkOverdue(h, now);
-    const due = overdue ? { date: addDays(today, 1), minute: 24 * 60 } : deadlineMoment(h.deadline);
+    const due = isHomeworkOverdue(h, now) ? { date: addDays(today, 1), minute: 24 * 60 } : deadlineMoment(h.deadline);
     units.push({
       owner: 'homework',
       id: h.id,
@@ -91,6 +112,7 @@ export function planSchoolWork(data: PlannerData, now: Date, opts: SchoolPlanOpt
       total: h.estimatedMinutes,
       energy: h.energy,
       overBudget: overBudget.has(h.id),
+      activity: { keys: [`homework:${h.id}`] },
     });
   }
   for (const e of exams) {
@@ -105,14 +127,15 @@ export function planSchoolWork(data: PlannerData, now: Date, opts: SchoolPlanOpt
       title: `${subjectLabel(subjectById(data, e.subjectId)).name} · ${e.title}`,
       dueDate: window.to,
       dueMinute: 24 * 60,
+      fromDate: window.from,
       rank: PRIORITY_RANK[e.priority],
       remaining,
       total: e.desiredStudyMinutes,
       energy: e.energy,
       preferred: e.preferredTimeOfDay,
       overBudget: overBudget.has(e.id),
+      activity: { keys: [`exam:${e.id}`] },
       exam: e,
-      fromDate: window.from,
     });
   }
   if (units.length === 0) return result;
@@ -122,7 +145,7 @@ export function planSchoolWork(data: PlannerData, now: Date, opts: SchoolPlanOpt
   const lastDue = units.reduce((max, u) => (u.dueDate > max ? u.dueDate : max), today);
   const lastDate = lastDue < horizon ? lastDue : horizon;
   const dates: DateKey[] = [];
-  for (let d = today; d <= lastDate; d = addDays(d, 1)) dates.push(d);
+  for (let d = today; d <= lastDate; d = addDays(d, 1)) if (!opts.excludeDates?.includes(d)) dates.push(d);
   const days = buildPlanningDays(working, dates, now);
 
   // ── 4. Früheste Deadline zuerst ─────────────────────────────
@@ -143,65 +166,85 @@ export function planSchoolWork(data: PlannerData, now: Date, opts: SchoolPlanOpt
     return store[u.id];
   };
 
-  const place = (u: WorkUnit, day: PlanningDay, start: number, duration: number) => {
-    reserve(day, start, duration, planning);
-    const block: SchoolBlock = { id: createId('blk'), date: day.date, start: toHHMM(start), durationMin: duration, source: 'auto', done: false };
+  const place = (u: WorkUnit, p: Pick) => {
+    reserve(p.day, p.start, p.len, planning, u.activity);
+    const block: SchoolBlock = { id: createId('blk'), date: p.day.date, start: toHHMM(p.start), durationMin: p.len, source: 'auto', done: false };
     blocksOf(u).push(block);
     result.added.push({ owner: u.owner, id: u.id, title: u.title, block });
-    u.remaining -= duration;
+    u.remaining -= p.len;
   };
 
   const budgetOf = (u: WorkUnit, day: PlanningDay) => (u.overBudget ? Number.POSITIVE_INFINITY : day.schoolBudget);
-
-  /** Längster platzierbarer Block (zwischen min und max) an einem Tag. */
-  const tryChunk = (u: WorkUnit, day: PlanningDay, max: number, min: number, latestEnd?: number): boolean => {
-    const upper = Math.floor(Math.min(max, budgetOf(u, day)) / STEP) * STEP;
-    for (let len = upper; len >= min; len -= STEP) {
-      const choice = bestSlotInDay(working, day, len, { energy: u.energy, preferred: u.preferred, latestEnd });
-      if (choice) {
-        place(u, day, choice.start, len);
-        return true;
-      }
-    }
-    return false;
-  };
+  const minBlock = Math.max(STEP, school.minBlockMin);
 
   for (const u of units) {
     let budgetLimited = false;
-    if (u.owner === 'homework') {
-      const minBlock = Math.max(STEP, school.minBlockMin);
-      const split = school.allowSplitHomework;
-      // Beim Aufteilen nie länger als "max. Arbeit am Stück" – dazwischen plant die Fokus-Regel eine Pause.
-      const maxChunk = split ? Math.max(minBlock, planning.maxFocusMin) : Number.POSITIVE_INFINITY;
-      for (const day of days) {
-        if (u.remaining <= 0 || day.date > u.dueDate) break;
-        const latestEnd = day.date === u.dueDate ? u.dueMinute : undefined;
-        while (u.remaining > 0) {
-          if (budgetOf(u, day) < Math.min(u.remaining, minBlock)) {
-            budgetLimited = true;
-            break;
-          }
-          // a) Restzeit am Stück
-          if (budgetOf(u, day) >= u.remaining && u.remaining <= maxChunk) {
-            const choice = bestSlotInDay(working, day, u.remaining, { energy: u.energy, latestEnd });
-            if (choice) {
-              place(u, day, choice.start, u.remaining);
-              break;
-            }
-          } else if (budgetOf(u, day) < u.remaining) budgetLimited = true;
-          // b) Aufteilen – der Rest muss mindestens einen Mindestblock lang bleiben.
-          if (!split || u.remaining < 2 * minBlock) break;
-          if (!tryChunk(u, day, Math.min(u.remaining - minBlock, maxChunk), minBlock, latestEnd)) break;
+    const pool = () =>
+      days.filter((d) => d.date <= u.dueDate && (!u.fromDate || d.date >= u.fromDate) && !dayHasActivity(d, u.activity));
+    const latestEndOf = (d: PlanningDay) => (d.date === u.dueDate ? u.dueMinute : undefined);
+    const dayScore = (d: PlanningDay, len: number, slotScore: number) =>
+      slotScore +
+      // Am Abgabetag zählt nur die Zeit vor der Stunde, nicht der Rest des Tages.
+      (d.date === u.dueDate && u.dueMinute < 24 * 60 ? balanceFromRemaining(freeBefore(d, u.dueMinute) - len) : balanceScore(d, len)) -
+      d.index * (u.owner === 'homework' ? 2 : 0.5) -
+      (u.owner === 'homework' && d.date === u.dueDate && days.some((x) => x.date < u.dueDate) ? DUE_DAY_PENALTY : 0);
+
+    /** Bester Tag für einen Block mit Länge zwischen min und max (größere Blöcke leicht bevorzugt). */
+    const bestPick = (candidates: PlanningDay[], max: number, min: number): Pick | null => {
+      let best: Pick | null = null;
+      for (const d of candidates) {
+        const budget = budgetOf(u, d);
+        if (budget < min) {
+          budgetLimited = true;
+          continue;
+        }
+        const upper = Math.floor(Math.min(max, budget) / STEP) * STEP;
+        for (let len = upper; len >= min; len -= STEP) {
+          const c = bestSlotInDay(working, d, len, { energy: u.energy, preferred: u.preferred, latestEnd: latestEndOf(d) });
+          if (!c) continue;
+          const score = dayScore(d, len, c.score) + len / 5;
+          if (!best || score > best.score) best = { day: d, start: c.start, len, score };
+          break;
         }
       }
+      return best;
+    };
+
+    if (u.owner === 'homework') {
+      const split = school.allowSplitHomework;
+      const maxChunk = split ? Math.max(minBlock, planning.maxFocusMin) : Number.POSITIVE_INFINITY;
+      while (u.remaining >= STEP) {
+        const candidates = pool();
+        if (candidates.length === 0) break;
+        // a) Restzeit am Stück – lange Aufgaben nur, wenn es keinen anderen Tag gibt (oder nach Bestätigung).
+        const longOk = !split || u.overBudget || candidates.length === 1;
+        let pick = u.remaining <= maxChunk || longOk ? bestPick(candidates, u.remaining, u.remaining) : null;
+        // b) Sonst ein möglichst großes Stück an einem Tag; der Rest folgt an einem anderen Tag.
+        if (!pick && split && u.remaining >= 2 * minBlock) pick = bestPick(candidates, Math.min(maxChunk, u.remaining - minBlock), minBlock);
+        if (!pick) break;
+        place(u, pick);
+      }
     } else {
-      planExam(u, days, school.minBlockMin, school.maxStudyMinPerDay, school.defaultStudySessionMin, tryChunk, () => {
-        budgetLimited = true;
-      });
+      // Lernzeit: n Einheiten auf verschiedene Tage, freie Tage zuerst.
+      const exam = u.exam!;
+      const dayCap = Math.max(minBlock, school.maxStudyMinPerDay);
+      const sessionLen = Math.min(dayCap, Math.max(minBlock, exam.sessionMinutes ?? school.defaultStudySessionMin));
+      const planned = Math.max(1, Math.ceil(u.remaining / sessionLen));
+      let placed = 0;
+      while (u.remaining >= minBlock) {
+        const candidates = pool();
+        if (candidates.length === 0) break;
+        const sessionsLeft = Math.max(1, Math.min(candidates.length, planned - placed));
+        const target = Math.min(dayCap, u.remaining, Math.max(minBlock, Math.ceil(u.remaining / sessionsLeft / STEP) * STEP));
+        const pick = bestPick(candidates, target, minBlock);
+        if (!pick) break;
+        place(u, pick);
+        placed += 1;
+      }
     }
 
     if (u.remaining >= STEP) {
-      const placed = u.total - u.remaining;
+      const done = u.total - u.remaining;
       result.unplanned.push({
         owner: u.owner,
         id: u.id,
@@ -211,61 +254,10 @@ export function planSchoolWork(data: PlannerData, now: Date, opts: SchoolPlanOpt
           ? `Freizeit-Schutz: Es fehlen ${formatDuration(u.remaining)} – mehr freie Zeit darf nicht automatisch verplant werden.`
           : u.owner === 'homework'
             ? `Bis zur Deadline ist nicht genug freie Zeit (${formatDuration(u.remaining)} fehlen).`
-            : `Bis zum Test ist nicht genug freie Zeit (${formatDuration(placed)} von ${formatDuration(u.total)} eingeplant).`,
+            : `Bis zum Test ist nicht genug freie Zeit (${formatDuration(done)} von ${formatDuration(u.total)} eingeplant).`,
       });
     }
   }
 
   return result;
-}
-
-/**
- * Lernzeit eines Tests gleichmäßig verteilen:
- * n ≈ Restzeit / Einheitslänge Einheiten auf gleichmäßig verteilte Tage, je Tag höchstens eine Einheit.
- * Scheitert ein Tag, wird ein anderer freier Tag genommen; Reste füllen übrige Tage (bis zum Tageslimit).
- */
-function planExam(
-  u: WorkUnit,
-  days: PlanningDay[],
-  minBlockMin: number,
-  maxPerDay: number,
-  defaultSession: number,
-  tryChunk: (u: WorkUnit, day: PlanningDay, max: number, min: number) => boolean,
-  onBudgetLimit: () => void,
-): void {
-  const exam = u.exam!;
-  const minS = Math.max(STEP, minBlockMin);
-  const dayCap = Math.max(minS, maxPerDay);
-  const sessionLen = Math.min(dayCap, Math.max(minS, exam.sessionMinutes ?? defaultSession));
-  // Tage, an denen für diesen Test schon eine Einheit liegt, bekommen keine zweite.
-  const taken = new Set(exam.studySessions.map((s) => s.date));
-  const free = days.filter((d) => d.date >= (u.fromDate ?? d.date) && d.date <= u.dueDate && !taken.has(d.date));
-  if (free.length === 0) return;
-
-  const used = new Set<string>();
-  const n = Math.min(free.length, Math.max(1, Math.ceil(u.remaining / sessionLen)));
-  const picks = Array.from({ length: n }, (_, k) => Math.floor((k * free.length) / n));
-
-  for (let k = 0; k < picks.length && u.remaining >= minS; k++) {
-    const sessionsLeft = picks.length - k;
-    const target = Math.min(dayCap, Math.max(minS, Math.ceil(u.remaining / sessionsLeft / STEP) * STEP));
-    // Gewählter Tag, sonst der nächste freie danach, sonst davor.
-    const order = [...free.slice(picks[k]), ...free.slice(0, picks[k]).reverse()].filter((d) => !used.has(d.date));
-    for (const day of order) {
-      if (day.schoolBudget < minS && !u.overBudget) {
-        onBudgetLimit();
-        continue;
-      }
-      if (tryChunk(u, day, Math.min(target, u.remaining), minS)) {
-        used.add(day.date);
-        break;
-      }
-    }
-  }
-  // Reste auf weitere freie Tage verteilen.
-  for (const day of free) {
-    if (u.remaining < minS) break;
-    if (used.has(day.date)) continue;
-    if (tryChunk(u, day, Math.min(dayCap, u.remaining), minS)) used.add(day.date);
-  }
 }

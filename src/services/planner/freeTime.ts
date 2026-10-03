@@ -32,7 +32,8 @@ export function planningBudget(schedule: DaySchedule, planning: PlanningSettings
   const plannable = free + scheduled;
   const stateShare = schedule.dayState.definition.maxPlannedShare;
   const effective = Math.max(0, Math.min(1, stateShare !== undefined ? Math.min(share, stateShare) : share));
-  const cap = Math.min(plannable * effective, plannable - planning.minFreeTimeMin);
+  // Mindest-Freizeit des Tages (Einstellung oder "Mehr Freizeit"-Wunsch) bleibt immer frei.
+  const cap = Math.min(plannable * effective, plannable - (schedule.requiredFreeMin ?? planning.minFreeTimeMin));
   return Math.max(0, Math.floor(cap - scheduled));
 }
 

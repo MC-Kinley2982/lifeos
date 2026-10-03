@@ -13,7 +13,7 @@ import { TodayPage } from './features/today/TodayPage';
 import { WeekPage } from './features/week/WeekPage';
 import { LinkDecisionDialog } from './features/cloud/LinkDecisionDialog';
 import { useCloud } from './store/cloud';
-import { useSchoolAutoPlanner } from './store/schoolAutomation';
+import { usePlanMaintenance } from './store/schoolAutomation';
 import { useAppStore } from './store/useAppStore';
 import { Toaster } from './ui/toast';
 
@@ -48,7 +48,7 @@ export function App() {
   const cloudReady = useCloud((s) => s.ready);
   const linkPending = useCloud((s) => !!s.linkDecision);
   const route = useRoute();
-  useSchoolAutoPlanner(onboardingDone && cloudReady && !linkPending);
+  usePlanMaintenance(onboardingDone && cloudReady && !linkPending);
 
   return (
     <>

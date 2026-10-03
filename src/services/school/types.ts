@@ -14,6 +14,8 @@ export interface SchoolPlanOptions {
    * (nur nach ausdrücklicher Bestätigung durch den Nutzer).
    */
   overBudgetIds?: ID[];
+  /** An diesen Tagen nichts einplanen (z. B. beim Verschieben für mehr Freizeit). */
+  excludeDates?: DateKey[];
 }
 
 export interface SchoolPlanAddition {

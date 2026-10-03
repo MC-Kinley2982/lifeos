@@ -47,6 +47,9 @@ export const createDailySlice: SliceCreator<DailySlice> = (set) => ({
   setHomeworkPrompt: (date, status, until) =>
     set((state) => patchDaily(state, date, (d) => ({ ...d, homeworkPrompt: { status, until } }))),
 
+  setFreeTarget: (date, minutes) =>
+    set((state) => patchDaily(state, date, (d) => ({ ...d, freeTarget: minutes && minutes > 0 ? Math.round(minutes) : undefined }))),
+
   addSpecialDay: (d) => set((state) => ({ specialDays: [...state.specialDays, d] })),
   updateSpecialDay: (id, patch) => set((state) => ({ specialDays: patchById(state.specialDays, id, patch) })),
   removeSpecialDay: (id) => set((state) => ({ specialDays: removeById(state.specialDays, id) })),

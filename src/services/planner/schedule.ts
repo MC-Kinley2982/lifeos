@@ -269,6 +269,7 @@ export function buildDaySchedule(data: PlannerData, date: DateKey): DaySchedule 
     inactive,
     freeSlots,
     totalFreeMin: totalMinutes(freeSlots),
+    requiredFreeMin: Math.max(settings.planning.minFreeTimeMin, daily.freeTarget ?? 0),
     scheduledTaskMin,
   };
 }

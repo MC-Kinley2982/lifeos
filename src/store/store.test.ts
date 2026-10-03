@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { STATE_IDS } from '../domain/defaults';
 import { routineSource } from '../domain/sources';
+import type { Task } from '../domain/types';
+import { migrate } from './persistence';
+import { GOAL_SESSION_DESCRIPTION } from './slices/tasksSlice';
 import { useAppStore } from './useAppStore';
 
 const TODAY = '2026-09-29';
@@ -45,7 +48,7 @@ describe('useAppStore', () => {
       { id: 'a', kind: 'task', taskId: task.id, title: task.title, date: TODAY, start: 930, end: 975, energy: 'medium', estimatedEnergy: 3, reasons: [] },
       { id: 'b', kind: 'goal', goalId: goal.id, title: goal.title, date: TODAY, start: 1200, end: 1260, energy: 'high', estimatedEnergy: 3, reasons: [] },
     ]);
-    expect(store().tasks.find((t) => t.id === task.id)?.schedule).toEqual({ date: TODAY, start: '15:30' });
+    expect(store().tasks.find((t) => t.id === task.id)?.schedule).toEqual({ date: TODAY, start: '15:30', auto: true });
     expect(store().tasks).toHaveLength(before + 1);
     expect(store().tasks.at(-1)).toMatchObject({ goalId: goal.id, estimatedMin: 60, schedule: { date: TODAY, start: '20:00' } });
   });
@@ -68,6 +71,14 @@ describe('useAppStore', () => {
     store().toggleSkipSource(TODAY, 'meal:x');
     store().setEnergy(TODAY, null);
     expect(store().dailyStates[TODAY]).toMatchObject({ energy: undefined, skippedSources: [] });
+  });
+
+  it('Migration V3 markiert früher automatisch geplante Ziel-Einheiten als verschiebbar', () => {
+    const base = { estimatedMin: 30, priority: 'medium', categoryId: 'cat_hobby', energy: 'medium', status: 'todo', createdAt: '', updatedAt: '' } as const;
+    const session: Task = { ...base, id: 's', title: 'Schach', description: GOAL_SESSION_DESCRIPTION, schedule: { date: TODAY, start: '09:00' } };
+    const manual: Task = { ...base, id: 'm', title: 'Schach', schedule: { date: TODAY, start: '15:00' } };
+    const migrated = migrate({ tasks: [session, manual] }, 2);
+    expect(migrated.tasks?.map((t) => t.schedule?.auto)).toEqual([true, undefined]);
   });
 
   it('Export und Import ergeben dieselben Daten', () => {

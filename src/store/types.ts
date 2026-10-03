@@ -46,6 +46,7 @@ import type {
 } from '../domain/factories';
 import type { PlanItem } from '../services/planner/types';
 import type { SchoolPlanResult } from '../services/school/types';
+import type { RebalanceResult } from '../services/planner/rebalance';
 
 /** Alles, was persistiert wird. */
 export interface AppData {
@@ -163,6 +164,8 @@ export interface DailyActions {
   removeSpecialDay(id: ID): void;
   /** Hausaufgaben-Nachfrage für einen Tag als erledigt markieren oder vertagen. */
   setHomeworkPrompt(date: DateKey, status: 'done' | 'snoozed', until?: string): void;
+  /** "Mehr Freizeit": an diesem Tag mindestens so viele Minuten frei halten (null = aufheben). */
+  setFreeTarget(date: DateKey, minutes: number | null): void;
 }
 
 export interface DataActions {
@@ -172,6 +175,8 @@ export interface DataActions {
   resetAll(): void;
   /** Ersetzt alle Daten (z. B. durch Cloud-Daten). Wird von der Synchronisierung genutzt. */
   replaceData(data: AppData): void;
+  /** Verschiebungen zur Entlastung von Tagen übernehmen. */
+  applyRebalance(result: RebalanceResult): void;
 }
 
 export type AppState = AppData &

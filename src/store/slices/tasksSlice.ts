@@ -9,6 +9,9 @@ export interface TasksSlice extends TaskActions {
   tasks: Task[];
 }
 
+/** Beschreibung von Aufgaben, die die Auto-Planung aus Ziel-Einheiten erzeugt. */
+export const GOAL_SESSION_DESCRIPTION = 'Automatisch geplante Ziel-Einheit';
+
 export const createTasksSlice: SliceCreator<TasksSlice> = (set, get) => ({
   tasks: [],
 
@@ -38,7 +41,8 @@ export const createTasksSlice: SliceCreator<TasksSlice> = (set, get) => ({
     set((state) => {
       let tasks = state.tasks;
       for (const item of items) {
-        const schedule = { date: item.date, start: toHHMM(item.start) };
+        // auto: von der Planung gesetzt → darf später zum Schutz der Freizeit verschoben werden.
+        const schedule = { date: item.date, start: toHHMM(item.start), auto: true };
         if (item.kind === 'task' && item.taskId) {
           tasks = patchEntity(tasks, item.taskId, { schedule });
         } else if (item.kind === 'goal' && item.goalId) {
@@ -47,7 +51,7 @@ export const createTasksSlice: SliceCreator<TasksSlice> = (set, get) => ({
           const task = stamp<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>(
             {
               title: goal.title,
-              description: 'Automatisch geplante Ziel-Einheit',
+              description: GOAL_SESSION_DESCRIPTION,
               estimatedMin: item.end - item.start,
               priority: 'medium',
               categoryId: goal.categoryId ?? settings.categories[0]?.id ?? '',

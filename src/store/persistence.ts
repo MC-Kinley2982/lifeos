@@ -1,5 +1,6 @@
 import { CATEGORY_IDS, createDefaultSettings, defaultSchoolSettings, STATE_IDS } from '../domain/defaults';
 import type { Exam, Homework, Routine, SchoolSettings, Settings } from '../domain/types';
+import { GOAL_SESSION_DESCRIPTION } from './slices/tasksSlice';
 import type { AppData, AppState } from './types';
 
 export const DATA_KEYS = [
@@ -112,6 +113,8 @@ export function normalizeData(raw: Partial<AppData> | undefined): AppData {
 /**
  * Migrationen zwischen Speicher-Versionen.
  * V1 → V2: Schule (Fächer, Stundenplan, Hausaufgaben, Tests) und Planungsanteil für "Krank".
+ * V2 → V3: Früher automatisch geplante Ziel-Einheiten als `auto` markieren – sie dürfen
+ *          zum Schutz der Freizeit (und gegen Doppelungen) verschoben werden.
  */
 export function migrate(persisted: unknown, version: number): Partial<AppData> {
   const data = (persisted ?? {}) as Partial<AppData>;
@@ -122,6 +125,11 @@ export function migrate(persisted: unknown, version: number): Partial<AppData> {
         st.id === STATE_IDS.sick && st.maxPlannedShare === undefined ? { ...st, maxPlannedShare: 0.3 } : st,
       ),
     };
+  }
+  if (version < 3 && Array.isArray(data.tasks)) {
+    data.tasks = data.tasks.map((t) =>
+      t.description === GOAL_SESSION_DESCRIPTION && t.schedule && !t.schedule.auto ? { ...t, schedule: { ...t.schedule, auto: true } } : t,
+    );
   }
   return data;
 }

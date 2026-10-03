@@ -1,7 +1,7 @@
 import { formatDuration, formatHoursClock, toDateKey } from '../../domain/time';
 import type { DateKey, EnergyState, Goal, Priority, Task, TaskEnergy, TimeOfDay } from '../../domain/types';
 import { computeGoalProgress } from './goals';
-import { bestSlotInDay, buildPlanningDays, reserve, type PlanningDay } from './placement';
+import { activityToken, balanceScore, bestSlotInDay, buildPlanningDays, dayHasActivity, reserve, type Activity, type PlanningDay } from './placement';
 import { priorityScore, urgencyScore } from './scoring';
 import type { PlanItem, PlannerData, PlanOptions, PlanResult, UnplannedItem } from './types';
 
@@ -17,6 +17,7 @@ interface Unit {
   deadline?: DateKey;
   /** Nur an diesem Tag planen (Aufgabe ist bereits einem Tag zugeordnet). */
   fixedDate?: DateKey;
+  activity: Activity;
   score: number;
   reasons: string[];
 }
@@ -32,7 +33,11 @@ interface Placement {
 /**
  * Regelbasierte Auto-Planung: verteilt offene Aufgaben (und optional Ziel-Einheiten)
  * auf freie Zeit. Schlägt nur vor – übernommen wird erst durch den Nutzer.
- * Bereits eingeplante Hausaufgaben und Lernzeiten haben Vorrang und zählen zum Budget.
+ *
+ * - Tage mit viel freier Zeit (z. B. Wochenende) werden bevorzugt, volle Tage geschont.
+ * - Die Mindest-Freizeit jedes Tages bleibt frei (Freizeit-Schutz).
+ * - Jede Aktivität höchstens einmal pro Tag (z. B. kein zweites "Schach" am selben Tag).
+ * - Bereits eingeplante Hausaufgaben und Lernzeiten haben Vorrang und zählen zum Budget.
  */
 export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
   const today = toDateKey(options.now);
@@ -57,7 +62,7 @@ export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
 
   const placedGoalMinutes: Record<string, number> = {};
   for (const unit of taskUnits) {
-    const result = placeUnit(data, days, unit, today);
+    const result = placeUnit(data, days, unit, today, !!options.preferSoon);
     if ('reason' in result) {
       unplanned.push({ taskId: unit.task?.id, title: unit.title, reason: result.reason });
       continue;
@@ -76,7 +81,6 @@ export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
       let remaining = (p?.remainingMin ?? goal.target.minutes) - (placedGoalMinutes[goal.id] ?? 0);
       const sessionLen = goal.sessionMin > 0 ? goal.sessionMin : planning.defaultGoalSessionMin;
       let session = 1;
-      const usedDays = new Set<string>();
       while (remaining >= planning.minSlotMin && session <= days.length) {
         const duration = Math.min(sessionLen, remaining);
         const unit: Unit = {
@@ -87,16 +91,16 @@ export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
           duration,
           energy: goal.energy,
           preferred: goal.preferredTimeOfDay,
+          activity: { keys: [`goal:${goal.id}`], token: activityToken(goal.title) },
           score: 0,
           reasons: [`Ziel: noch ${formatHoursClock(remaining)} h diese Woche`],
         };
-        const result = placeUnit(data, days, unit, today, usedDays);
+        const result = placeUnit(data, days, unit, today, !!options.preferSoon);
         if ('reason' in result) {
           unplanned.push({ goalId: goal.id, title: `${goal.title} (${formatDuration(remaining)} offen)`, reason: result.reason });
           break;
         }
         items.push(commit(data, result, unit));
-        usedDays.add(result.day.date);
         remaining -= duration;
         session += 1;
       }
@@ -125,23 +129,28 @@ function taskUnit(task: Task, today: DateKey, fixedDate?: DateKey): Unit {
     preferred: task.preferredTimeOfDay,
     deadline: task.deadline,
     fixedDate,
+    activity: { keys: [`task:${task.id}`, ...(task.goalId ? [`goal:${task.goalId}`] : [])], token: activityToken(task.title) },
     score: urgency.points + prio.points + (fixedDate ? 25 : 0),
     reasons,
   };
 }
 
-function placeUnit(data: PlannerData, days: PlanningDay[], unit: Unit, today: DateKey, excludeDays?: Set<string>): Placement | { reason: string } {
+function placeUnit(data: PlannerData, days: PlanningDay[], unit: Unit, today: DateKey, preferSoon: boolean): Placement | { reason: string } {
   const overdue = !!unit.deadline && unit.deadline < today;
   let best: Placement | null = null;
   let budgetBlocked = false;
   let noSlot = false;
   let afterDeadline = false;
+  let alreadyPlanned = false;
 
   for (const day of days) {
     if (unit.fixedDate && day.date !== unit.fixedDate) continue;
-    if (excludeDays?.has(day.date)) continue;
     if (unit.deadline && !overdue && day.date > unit.deadline) {
       afterDeadline = true;
+      continue;
+    }
+    if (dayHasActivity(day, unit.activity)) {
+      alreadyPlanned = true;
       continue;
     }
     if (day.generalBudget < unit.duration) {
@@ -153,20 +162,23 @@ function placeUnit(data: PlannerData, days: PlanningDay[], unit: Unit, today: Da
       noSlot = true;
       continue;
     }
-    const score = choice.score - day.index * (unit.deadline ? 6 : 3); // frühere Tage bevorzugen
+    // Tage mit viel freier Zeit bevorzugen; frühere Tage nur bei Deadlines oder beim Verschieben
+    // (sonst nur als Gleichstand-Entscheid).
+    const score = choice.score + balanceScore(day, unit.duration) - day.index * (unit.deadline || preferSoon ? 2 : 0.2);
     if (!best || score > best.score) best = { day, start: choice.start, score, energy: choice.energy, reasons: choice.reasons };
   }
 
   if (best) return best;
-  if (budgetBlocked) return { reason: 'Freizeit-Schutz: Das Planungsbudget des Tages ist ausgeschöpft.' };
+  if (budgetBlocked) return { reason: 'Freizeit-Schutz: An den passenden Tagen muss die restliche Zeit frei bleiben.' };
   if (noSlot) return { reason: `Keine freie Lücke ist lang genug (braucht ${formatDuration(unit.duration)}).` };
+  if (alreadyPlanned) return { reason: 'Steht an allen passenden Tagen schon im Plan (höchstens einmal pro Tag).' };
   if (afterDeadline) return { reason: 'Vor der Deadline ist keine passende Zeit mehr frei.' };
   return { reason: 'Kein passender Zeitpunkt im Planungszeitraum gefunden.' };
 }
 
 function commit(data: PlannerData, p: Placement, unit: Unit): PlanItem {
   const { day, start } = p;
-  reserve(day, start, unit.duration, data.settings.planning);
+  reserve(day, start, unit.duration, data.settings.planning, unit.activity);
   return {
     id: `${unit.key}@${day.date}`,
     kind: unit.kind,

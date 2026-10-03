@@ -297,6 +297,8 @@ export interface TaskSchedule {
   date: DateKey;
   /** Ohne Startzeit = "an diesem Tag erledigen", mit Startzeit = fester Block im Tagesplan. */
   start?: TimeHHMM;
+  /** Von der automatischen Planung gesetzt – darf zum Schutz der Freizeit verschoben werden. */
+  auto?: boolean;
 }
 
 export interface Task {
@@ -460,6 +462,11 @@ export interface DailyState {
   note?: string;
   /** Nachfrage "Welche Hausaufgaben hast du heute bekommen?" – beantwortet oder vertagt. */
   homeworkPrompt?: { status: 'done' | 'snoozed'; until?: ISODateTime };
+  /**
+   * "Ich brauche heute mehr Freizeit": an diesem Tag mindestens so viele Minuten frei halten
+   * (gemessen ab dem Zeitpunkt der Anfrage). Automatisch geplante Dinge werden dafür verschoben.
+   */
+  freeTarget?: number;
 }
 
 export interface Vacation {
@@ -576,5 +583,7 @@ export interface DaySchedule {
   inactive: Array<{ sourceKey: SourceKey; title: string; reason: 'state' | 'skipped' }>;
   freeSlots: TimeSlot[];
   totalFreeMin: number;
+  /** So viel Zeit muss an diesem Tag frei bleiben (Einstellung bzw. "Mehr Freizeit"-Wunsch). */
+  requiredFreeMin: number;
   scheduledTaskMin: number;
 }

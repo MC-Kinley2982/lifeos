@@ -1,19 +1,27 @@
-import { Hourglass, ShieldCheck, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Coffee, Hourglass, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { formatDuration } from '../../domain/time';
 import type { DaySchedule } from '../../domain/types';
 import { freeMinutesFrom, planningBudget } from '../../services/planner';
+import { clearFreeTarget } from '../../store/schoolAutomation';
 import { useAppStore } from '../../store/useAppStore';
 import { Button } from '../../ui/Button';
 import { Card, CardHeader } from '../../ui/Card';
+import { MoreFreeTimeSheet } from './MoreFreeTimeSheet';
 
 /**
  * Freie Zeit ist ein eigener Zustand: Die Karte zeigt sie, schlägt Planung vor –
- * verlangt aber nicht, sie zu füllen.
+ * verlangt aber nicht, sie zu füllen. "Mehr Freizeit" verlegt Geplantes auf andere Tage.
  */
 export function FreeTimeCard({ schedule, fromMinute, editable, onPlan }: { schedule: DaySchedule; fromMinute: number; editable: boolean; onPlan: () => void }) {
   const planning = useAppStore((s) => s.settings.planning);
+  const freeTarget = useAppStore((s) => s.dailyStates[schedule.date]?.freeTarget);
+  const [moreOpen, setMoreOpen] = useState(false);
   const free = freeMinutesFrom(schedule, fromMinute);
   const budget = planningBudget(schedule, planning, fromMinute);
+  // Der "Mehr Freizeit"-Wunsch gilt für den ganzen Tag – angezeigt wird, was davon ab jetzt noch frei bleibt.
+  const targetLeft = freeTarget === undefined ? undefined : Math.max(0, freeTarget - (freeMinutesFrom(schedule, 0) - free));
+  const keepFree = targetLeft === undefined ? schedule.requiredFreeMin : Math.max(planning.minFreeTimeMin, targetLeft);
   const awakeMin = Math.max(1, schedule.awake.end - schedule.awake.start);
   const busyMin = Math.max(0, awakeMin - schedule.totalFreeMin - schedule.scheduledTaskMin);
   const pct = (m: number) => `${Math.max(0, (m / awakeMin) * 100)}%`;
@@ -43,14 +51,31 @@ export function FreeTimeCard({ schedule, fromMinute, editable, onPlan }: { sched
             <ShieldCheck size={15} className="mt-0.5 shrink-0 text-emerald-400" />
             <span>
               Freizeit bleibt Freizeit. Automatisch verplant wird höchstens{' '}
-              <span className="font-medium text-ink">{formatDuration(budget)}</span> – mindestens {formatDuration(planning.minFreeTimeMin)} bleiben immer frei.
+              <span className="font-medium text-ink">{formatDuration(budget)}</span> – mindestens {formatDuration(keepFree)} bleiben immer frei.
             </span>
           </div>
-          <Button variant="secondary" icon={Sparkles} block className="mt-3" onClick={onPlan} disabled={free < planning.minSlotMin}>
-            Aufgaben automatisch einplanen
-          </Button>
+          {targetLeft !== undefined && (
+            <div className="mt-2 flex items-center gap-2 rounded-2xl border border-violet-400/25 bg-violet-500/[0.07] px-3 py-2 text-xs">
+              <Coffee size={14} className="shrink-0 text-violet-300" />
+              <span className="flex-1">
+                Mehr Freizeit aktiv: mindestens {formatDuration(targetLeft)} {fromMinute > 0 ? 'noch ' : ''}frei
+              </span>
+              <button type="button" onClick={() => clearFreeTarget(schedule.date)} className="rounded-lg p-1 text-ink-faint hover:bg-white/5 hover:text-ink" aria-label="Wunsch aufheben" title="Aufheben">
+                <X size={13} />
+              </button>
+            </div>
+          )}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button variant="secondary" icon={Coffee} onClick={() => setMoreOpen(true)}>
+              Mehr Freizeit
+            </Button>
+            <Button variant="secondary" icon={Sparkles} onClick={onPlan} disabled={free < planning.minSlotMin}>
+              Einplanen
+            </Button>
+          </div>
         </>
       )}
+      {moreOpen && <MoreFreeTimeSheet date={schedule.date} freeNow={free} onClose={() => setMoreOpen(false)} />}
     </Card>
   );
 }

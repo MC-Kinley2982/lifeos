@@ -80,6 +80,8 @@ export interface PlanOptions {
   includeGoals: boolean;
   /** Nur diese Aufgaben planen (optional). */
   taskIds?: ID[];
+  /** Frühere Tage deutlich bevorzugen – beim Verschieben soll es nicht unnötig weit nach hinten gehen. */
+  preferSoon?: boolean;
 }
 
 export interface SuggestionItem {

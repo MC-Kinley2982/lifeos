@@ -35,4 +35,14 @@ export const createDataSlice: SliceCreator<DataActions> = (set, get) => ({
   resetAll: () => set(emptyData()),
 
   replaceData: (data) => set(normalizeData(data)),
+
+  applyRebalance: (r) =>
+    set((s) => {
+      const ts = new Date().toISOString();
+      return {
+        tasks: s.tasks.map((t) => (t.id in r.tasks ? { ...t, schedule: r.tasks[t.id], updatedAt: ts } : t)),
+        homework: s.homework.map((h) => (h.id in r.homework ? { ...h, plannedBlocks: r.homework[h.id], updatedAt: ts } : h)),
+        exams: s.exams.map((e) => (e.id in r.exams ? { ...e, studySessions: r.exams[e.id], updatedAt: ts } : e)),
+      };
+    }),
 });

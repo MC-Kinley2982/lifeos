@@ -140,17 +140,24 @@ describe('Fall 2: Aufteilen, wenn ein Tag nicht reicht', () => {
     return { settings, routines: [blocker], events: [], tasks: [], goals: [], dailyStates: {}, vacations: [], specialDays: [], subjects: [math], timetable: [lesson], homework: [], exams: [] };
   }
 
-  it('Mittwoch 30 min frei, Donnerstag vor der Stunde 60 min → 30 + 30 min, alles vor der Deadline', () => {
+  it('60 min: Mittwoch nur 30 min frei, Donnerstag vor der Stunde 60 min → am Stück in den passenden Block', () => {
     const data = tightData();
     data.homework = [{ ...createHomeworkInput(data, 'ma', WED, { estimatedMinutes: 60 }), id: 'hw', createdAt: ts, updatedAt: ts }];
     expect(data.homework[0].deadline).toMatchObject({ date: THU, time: '08:00' });
 
     const result = planSchoolWork(data, at(WED, '06:00'));
-    const blocks = result.homework.hw;
-    expect(total(blocks)).toBe(60);
-    expect(blocks.map((b) => `${b.date} ${b.start} ${b.durationMin}`)).toEqual([`${WED} 07:00 30`, `${THU} 06:45 30`]);
-    expect(blocks.every((b) => b.date < THU || endOf(b) <= toMinutes('08:00'))).toBe(true);
+    expect(result.homework.hw.map((b) => `${b.date} ${b.start} ${b.durationMin}`)).toEqual([`${THU} 06:45 60`]);
     expect(result.unplanned).toHaveLength(0);
+  });
+
+  it('80 min passen nirgends am Stück → aufgeteilt, höchstens ein Block pro Tag, alles vor der Deadline', () => {
+    const data = tightData();
+    data.homework = [{ ...createHomeworkInput(data, 'ma', WED, { estimatedMinutes: 80 }), id: 'hw', createdAt: ts, updatedAt: ts }];
+    const blocks = planSchoolWork(data, at(WED, '06:00')).homework.hw;
+    expect(total(blocks)).toBe(80);
+    expect(new Set(blocks.map((b) => b.date)).size).toBe(blocks.length);
+    expect(blocks.map((b) => `${b.date} ${b.start} ${b.durationMin}`)).toEqual([`${WED} 07:00 30`, `${THU} 06:45 50`]);
+    expect(blocks.every((b) => b.date < THU || endOf(b) <= toMinutes('08:00'))).toBe(true);
   });
 
   it('ohne Aufteilen landet die Aufgabe vollständig im passenden Block', () => {
@@ -254,21 +261,26 @@ describe('Stabilität und manuelle Änderungen', () => {
     expect(total(blocks)).toBe(45);
   });
 
-  it('teilt lange Hausaufgaben in Blöcke von höchstens "max. Arbeit am Stück"', () => {
+  it('teilt lange Hausaufgaben auf mehrere Tage – je Tag ein Block, höchstens "max. Arbeit am Stück"', () => {
     const data = exampleData();
-    data.homework = [homework(data, 'Ma', WED, 200)];
+    const hw = homework(data, 'Ma', WED, 200);
+    hw.deadline = { date: '2026-10-05', time: '08:00', source: 'manual' };
+    data.homework = [hw];
     const blocks = planSchoolWork(data, at(WED, '14:30')).homework.hw_Ma;
     expect(total(blocks)).toBe(200);
     expect(blocks.every((b) => b.durationMin <= data.settings.planning.maxFocusMin)).toBe(true);
+    expect(new Set(blocks.map((b) => b.date)).size).toBe(blocks.length);
   });
 
   it('respektiert den Freizeit-Schutz – außer nach ausdrücklicher Bestätigung', () => {
     const data = exampleData();
-    data.homework = [homework(data, 'Ma', WED, 400)];
+    data.settings.planning.minFreeTimeMin = 300; // Mittwoch darf nur noch wenig verplant werden
+    data.homework = [homework(data, 'Ma', WED, 60)];
     const normal = planSchoolWork(data, at(WED, '14:30'));
     expect(normal.unplanned[0]?.reason).toMatch(/Freizeit-Schutz/);
     expect(normal.unplanned[0]?.missingMinutes).toBeGreaterThan(0);
     const forced = planSchoolWork(data, at(WED, '14:30'), { overBudgetIds: ['hw_Ma'] });
-    expect(total(forced.homework.hw_Ma)).toBeGreaterThan(total(normal.homework.hw_Ma));
+    expect(total(forced.homework.hw_Ma)).toBe(60);
+    expect(total(forced.homework.hw_Ma)).toBeGreaterThan(total(normal.homework.hw_Ma ?? []));
   });
 });

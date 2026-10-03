@@ -28,7 +28,8 @@ export function PlanningSection() {
             className="w-full accent-violet-500"
           />
         </SettingRow>
-        <SettingRow label="Immer frei lassen" description="Mindest-Freizeit pro Tag">
+        <SettingRow label="Immer frei lassen" description="Mindest-Freizeit pro Tag – wird garantiert: wird ein Tag zu voll, verschiebt LifeOS automatisch Geplantes auf andere Tage.">
+
           <NumberInput value={p.minFreeTimeMin} min={0} step={15} onChange={(v) => updatePlanning({ minFreeTimeMin: v })} suffix="min" />
         </SettingRow>
       </SettingsGroup>

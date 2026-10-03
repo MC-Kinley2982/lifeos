@@ -1,10 +1,12 @@
 import { planSchoolWork } from '../school/schoolPlanner';
 import type { SchoolPlanOptions, SchoolPlanResult } from '../school/types';
 import { planTasks } from './autoPlan';
+import { rebalanceDays, type RebalanceOptions, type RebalanceResult } from './rebalance';
 import { suggestNow } from './suggest';
 import type { NowSuggestion, PlannerData, PlanOptions, PlanResult } from './types';
 
 export * from './types';
+export type { RebalanceOptions, RebalanceResult, MovedItem } from './rebalance';
 export { buildDaySchedule, awakeWindow, sleepTimesFor, WORK_KINDS } from './schedule';
 export { resolveDayState, isSourceActive, getDailyState, emptyDailyState } from './dayState';
 export { estimateEnergy, requiredEnergy, energyFits } from './energy';
@@ -24,6 +26,8 @@ export interface PlannerStrategy {
   suggestNow(data: PlannerData, now: Date): NowSuggestion;
   /** Hausaufgaben und Lernzeit für Tests automatisch einplanen. */
   planSchoolWork(data: PlannerData, now: Date, options?: SchoolPlanOptions): SchoolPlanResult;
+  /** Überlastete Tage entlasten (Freizeit-Schutz, keine Doppelungen) – verschiebt automatisch Geplantes. */
+  rebalance(data: PlannerData, now: Date, options?: RebalanceOptions): RebalanceResult;
 }
 
 export const ruleBasedPlanner: PlannerStrategy = {
@@ -32,6 +36,7 @@ export const ruleBasedPlanner: PlannerStrategy = {
   plan: planTasks,
   suggestNow,
   planSchoolWork,
+  rebalance: rebalanceDays,
 };
 
 let activePlanner: PlannerStrategy = ruleBasedPlanner;
