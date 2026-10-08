@@ -23,6 +23,7 @@ import type {
 } from '../../domain/types';
 import { lessonsForWeekday, schoolSourceInfo, subjectById, subjectLabel, toLessonInfo } from '../school/timetable';
 import { getDailyState, isSourceActive, resolveDayState } from './dayState';
+import { protectedSlotsFor } from './protected';
 import type { PlannerData } from './types';
 
 const NOON = 12 * 60;
@@ -268,6 +269,7 @@ export function buildDaySchedule(data: PlannerData, date: DateKey): DaySchedule 
     exams,
     inactive,
     freeSlots,
+    protectedSlots: protectedSlotsFor(settings.planning.protectedPeriods, weekday, awake),
     totalFreeMin: totalMinutes(freeSlots),
     requiredFreeMin: Math.max(settings.planning.minFreeTimeMin, daily.freeTarget ?? 0),
     scheduledTaskMin,

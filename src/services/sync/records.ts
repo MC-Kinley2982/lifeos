@@ -18,6 +18,7 @@ export const LIST_COLLECTIONS = [
   'timetable',
   'homework',
   'exams',
+  'todos',
 ] as const;
 
 type ListCollection = (typeof LIST_COLLECTIONS)[number];
@@ -104,6 +105,7 @@ export interface DataSummary {
   homework: number;
   exams: number;
   events: number;
+  todos: number;
 }
 
 export function summarize(data: AppData): DataSummary {
@@ -115,5 +117,6 @@ export function summarize(data: AppData): DataSummary {
     homework: data.homework.length,
     exams: data.exams.length,
     events: data.events.length,
+    todos: data.todos.length,
   };
 }

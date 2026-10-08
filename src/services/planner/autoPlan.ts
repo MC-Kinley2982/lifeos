@@ -35,7 +35,9 @@ interface Placement {
  * auf freie Zeit. Schlägt nur vor – übernommen wird erst durch den Nutzer.
  *
  * - Tage mit viel freier Zeit (z. B. Wochenende) werden bevorzugt, volle Tage geschont.
- * - Die Mindest-Freizeit jedes Tages bleibt frei (Freizeit-Schutz).
+ * - Die Mindest-Freizeit jedes Tages bleibt frei (Freizeit-Schutz); geschützte Zeiträume
+ *   (z. B. Morgenroutine) sind tabu.
+ * - Reihenfolge: Aufgaben → geplante To-dos → Ziele. Normale To-dos werden nie geplant.
  * - Jede Aktivität höchstens einmal pro Tag (z. B. kein zweites "Schach" am selben Tag).
  * - Bereits eingeplante Hausaufgaben und Lernzeiten haben Vorrang und zählen zum Budget.
  */
@@ -58,7 +60,9 @@ export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
     if (assigned && !dateSet.has(assigned)) continue; // gehört zu einem anderen Tag
     taskUnits.push(taskUnit(task, today, assigned));
   }
-  taskUnits.sort((a, b) => b.score - a.score);
+  // Reihenfolge: Aufgaben vor geplanten To-dos (optional), danach erst Ziele (Abschnitt 2).
+  const tier = (u: Unit) => (u.task?.todoId ? 1 : 0);
+  taskUnits.sort((a, b) => tier(a) - tier(b) || b.score - a.score);
 
   const placedGoalMinutes: Record<string, number> = {};
   for (const unit of taskUnits) {
@@ -80,8 +84,10 @@ export function planTasks(data: PlannerData, options: PlanOptions): PlanResult {
       const p = progress[goal.id];
       let remaining = (p?.remainingMin ?? goal.target.minutes) - (placedGoalMinutes[goal.id] ?? 0);
       const sessionLen = goal.sessionMin > 0 ? goal.sessionMin : planning.defaultGoalSessionMin;
+      // Kein künstlicher Mini-Rest (z. B. 15 min): eine Einheit ist mindestens eine halbe Sitzungslänge lang.
+      const minSession = Math.max(planning.minSlotMin, Math.ceil(sessionLen / 2));
       let session = 1;
-      while (remaining >= planning.minSlotMin && session <= days.length) {
+      while (remaining >= minSession && session <= days.length) {
         const duration = Math.min(sessionLen, remaining);
         const unit: Unit = {
           key: `goal:${goal.id}:${session}`,

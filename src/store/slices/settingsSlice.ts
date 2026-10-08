@@ -99,7 +99,12 @@ export const createSettingsSlice: SliceCreator<SettingsSlice> = (set) => {
     updatePlanning: (patch) => update((s) => ({ planning: { ...s.planning, ...patch } })),
     upsertWorkWindow: (w) => update((s) => ({ planning: { ...s.planning, workWindows: upsertById(s.planning.workWindows, w) } })),
     removeWorkWindow: (id) => update((s) => ({ planning: { ...s.planning, workWindows: removeById(s.planning.workWindows, id) } })),
+    upsertProtectedPeriod: (p) => update((s) => ({ planning: { ...s.planning, protectedPeriods: upsertById(s.planning.protectedPeriods, p) } })),
+    removeProtectedPeriod: (id) => update((s) => ({ planning: { ...s.planning, protectedPeriods: removeById(s.planning.protectedPeriods, id) } })),
 
     updateUi: (patch) => update((s) => ({ ui: { ...s.ui, ...patch } })),
+
+    updateGoogleCalendar: (patch) =>
+      update((s) => ({ integrations: { ...s.integrations, googleCalendar: { ...s.integrations.googleCalendar, ...patch } } })),
   };
 };

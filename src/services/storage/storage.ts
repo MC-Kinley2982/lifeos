@@ -6,7 +6,7 @@ import { createJSONStorage } from 'zustand/middleware';
  * ohne Store oder UI anzufassen.
  */
 export const STORAGE_KEY = 'lifeos-data';
-export const STORAGE_VERSION = 3;
+export const STORAGE_VERSION = 4;
 
 export const appStorage = createJSONStorage(() => localStorage);
 

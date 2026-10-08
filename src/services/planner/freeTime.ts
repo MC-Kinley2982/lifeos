@@ -1,4 +1,4 @@
-import { intersectSlots, roundUpTo, toMinutes, totalMinutes } from '../../domain/time';
+import { intersectSlots, roundUpTo, subtractSlots, toMinutes, totalMinutes } from '../../domain/time';
 import type { DaySchedule, PlanningSettings, TimeOfDay, TimeSlot } from '../../domain/types';
 import { WORK_KINDS } from './schedule';
 
@@ -37,9 +37,12 @@ export function planningBudget(schedule: DaySchedule, planning: PlanningSettings
   return Math.max(0, Math.floor(cap - scheduled));
 }
 
-/** Freie Lücken, in denen automatisch geplant werden darf (Arbeitszeiten, Mindestlänge, Raster). */
+/**
+ * Freie Lücken, in denen automatisch geplant werden darf: ohne geschützte Zeiträume (z. B. Morgenroutine),
+ * nur in Arbeitszeiten (falls aktiv), mit Mindestlänge und Raster. Gilt für alle Planer gleichermaßen.
+ */
 export function plannableSlots(schedule: DaySchedule, planning: PlanningSettings, fromMinute = 0): TimeSlot[] {
-  let slots = freeSlotsFrom(schedule, fromMinute);
+  let slots = subtractSlots(freeSlotsFrom(schedule, fromMinute), schedule.protectedSlots ?? []);
   if (planning.useWorkWindows) {
     const windows = planning.workWindows
       .filter((w) => w.weekdays.includes(schedule.weekday))

@@ -16,8 +16,10 @@ import type {
   EnergySettings,
   Exam,
   Goal,
+  IntegrationSettings,
   Meal,
   PlanningSettings,
+  ProtectedPeriod,
   Routine,
   SchoolSettings,
   Settings,
@@ -173,6 +175,26 @@ export function defaultPlanningSettings(): PlanningSettings {
     eveningStarts: '18:00',
     energyRequirement: { low: 1, medium: 3, high: 4 },
     defaultGoalSessionMin: 60,
+    protectedPeriods: [morningRoutinePeriod()],
+  };
+}
+
+/**
+ * Vorlage "Morgenroutine": ab dem Aufstehen (je Tag die eigene Aufstehzeit) eine Weile geschützt.
+ * Ende und Wochentage sind in den Planungs-Einstellungen frei änderbar (z. B. "endet um 07:45").
+ */
+export function morningRoutinePeriod(): ProtectedPeriod {
+  return { id: createId('pp'), name: 'Morgenroutine', enabled: true, weekdays: [...ALL_WEEKDAYS], from: { at: 'wake' }, until: { at: 'duration', minutes: 45 } };
+}
+
+/** Google Kalender: nicht verbunden, nichts wird übertragen, bis der Nutzer es einschaltet. */
+export function defaultIntegrationSettings(): IntegrationSettings {
+  return {
+    googleCalendar: {
+      importEvents: true,
+      push: { events: false, homework: false, study: false, todos: false, routines: false },
+      reminder: { type: 'calendarDefault' },
+    },
   };
 }
 
@@ -203,7 +225,7 @@ export function defaultSchoolSettings(): SchoolSettings {
     askForHomework: true,
     autoPlan: true,
     allowSplitHomework: true,
-    minBlockMin: 15,
+    minBlockMin: 30,
     maxSchoolShare: 0.8,
     fallbackDeadlineDays: 7,
     lookaheadDays: 28,
@@ -249,7 +271,8 @@ export function createDefaultSettings(name = ''): Settings {
     categories: defaultCategories(),
     planning: defaultPlanningSettings(),
     school: defaultSchoolSettings(),
-    ui: { weekStartsOn: 0 },
+    ui: { weekStartsOn: 0, hideCompletedTodos: false },
+    integrations: defaultIntegrationSettings(),
   };
 }
 

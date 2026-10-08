@@ -12,6 +12,7 @@ export { resolveDayState, isSourceActive, getDailyState, emptyDailyState } from 
 export { estimateEnergy, requiredEnergy, energyFits } from './energy';
 export { freeSlotsFrom, freeMinutesFrom, planningBudget, plannableSlots, timeOfDayAt } from './freeTime';
 export { computeGoalProgress } from './goals';
+export { protectedSlotsFor, protectedAt } from './protected';
 
 /**
  * Abstraktionsschicht für Planungs-Strategien.

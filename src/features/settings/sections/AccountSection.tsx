@@ -6,13 +6,24 @@ import { toast } from '../../../ui/toast';
 import { AuthForm } from '../../cloud/AuthForm';
 import { SyncIndicator } from '../../cloud/SyncIndicator';
 import { SettingRow, SettingsGroup } from '../SettingsLayout';
+import { GoogleCalendarGroup } from './GoogleCalendarGroup';
 
 function formatTime(iso?: string): string {
   if (!iso) return '–';
   return new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
+/** Konto & Integrationen: Cloud-Konto (Geräte synchronisieren) und Google Kalender. */
 export function AccountSection() {
+  return (
+    <div className="space-y-4">
+      <CloudAccount />
+      <GoogleCalendarGroup />
+    </div>
+  );
+}
+
+function CloudAccount() {
   const state = useCloud();
   const [busy, setBusy] = useState(false);
 

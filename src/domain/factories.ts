@@ -14,6 +14,7 @@ import type {
   Subject,
   Task,
   TimetableEntry,
+  Todo,
   Vacation,
   Weekday,
 } from './types';
@@ -31,6 +32,8 @@ export type SubjectInput = Omit<Subject, 'id' | 'createdAt' | 'updatedAt'>;
 export type TimetableEntryInput = Omit<TimetableEntry, 'id' | 'createdAt' | 'updatedAt'>;
 export type HomeworkInput = Omit<Homework, 'id' | 'createdAt' | 'updatedAt'>;
 export type ExamInput = Omit<Exam, 'id' | 'createdAt' | 'updatedAt'>;
+/** Neues To-do: Titel und "wann" reichen, alles andere ist optional. */
+export type TodoInput = Omit<Todo, 'id' | 'createdAt' | 'updatedAt' | 'order' | 'completed' | 'completedAt'>;
 
 export function subjectDraft(): SubjectInput {
   return { name: '', shortName: '', color: '#60a5fa' };

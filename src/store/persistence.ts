@@ -1,5 +1,5 @@
 import { CATEGORY_IDS, createDefaultSettings, defaultSchoolSettings, STATE_IDS } from '../domain/defaults';
-import type { Exam, Homework, Routine, SchoolSettings, Settings } from '../domain/types';
+import type { Exam, Homework, Routine, SchoolSettings, Settings, Todo } from '../domain/types';
 import { GOAL_SESSION_DESCRIPTION } from './slices/tasksSlice';
 import type { AppData, AppState } from './types';
 
@@ -16,6 +16,7 @@ export const DATA_KEYS = [
   'timetable',
   'homework',
   'exams',
+  'todos',
 ] as const;
 
 export function pickData(state: AppState): AppData {
@@ -32,6 +33,7 @@ export function pickData(state: AppState): AppData {
     timetable: state.timetable,
     homework: state.homework,
     exams: state.exams,
+    todos: state.todos,
   };
 }
 
@@ -49,6 +51,7 @@ export function emptyData(): AppData {
     timetable: [],
     homework: [],
     exams: [],
+    todos: [],
   };
 }
 
@@ -74,6 +77,7 @@ export function normalizeData(raw: Partial<AppData> | undefined): AppData {
   const routines = arr<Routine>(raw.routines);
   const s = (raw.settings ?? {}) as Partial<Settings>;
   const d = base.settings;
+  const google = s.integrations?.googleCalendar;
   const settings: Settings = {
     ...d,
     ...s,
@@ -87,6 +91,15 @@ export function normalizeData(raw: Partial<AppData> | undefined): AppData {
     },
     school: normalizeSchool(s.school, routines),
     ui: { ...d.ui, ...s.ui },
+    integrations: {
+      ...d.integrations,
+      ...s.integrations,
+      googleCalendar: {
+        ...d.integrations.googleCalendar,
+        ...google,
+        push: { ...d.integrations.googleCalendar.push, ...google?.push },
+      },
+    },
     meals: Array.isArray(s.meals) ? s.meals : d.meals,
     breakRules: Array.isArray(s.breakRules) ? s.breakRules : d.breakRules,
     dayStates: Array.isArray(s.dayStates) && s.dayStates.length
@@ -107,14 +120,21 @@ export function normalizeData(raw: Partial<AppData> | undefined): AppData {
     timetable: arr(raw.timetable),
     homework: arr<Homework>(raw.homework).map((h) => ({ ...h, plannedBlocks: Array.isArray(h.plannedBlocks) ? h.plannedBlocks : [] })),
     exams: arr<Exam>(raw.exams).map((e) => ({ ...e, studySessions: Array.isArray(e.studySessions) ? e.studySessions : [] })),
+    todos: arr<Todo>(raw.todos),
   };
 }
+
+/** Bisheriger Standard für den kleinsten Hausaufgaben-/Lernblock – erzeugte künstliche 15-Minuten-Stücke. */
+const OLD_DEFAULT_MIN_BLOCK = 15;
 
 /**
  * Migrationen zwischen Speicher-Versionen.
  * V1 → V2: Schule (Fächer, Stundenplan, Hausaufgaben, Tests) und Planungsanteil für "Krank".
  * V2 → V3: Früher automatisch geplante Ziel-Einheiten als `auto` markieren – sie dürfen
  *          zum Schutz der Freizeit (und gegen Doppelungen) verschoben werden.
+ * V3 → V4: To-dos, geschützte Zeiträume (Morgenroutine) und Integrationen kommen über die
+ *          Standardwerte in normalizeData dazu. Der unveränderte alte Standard für den kleinsten
+ *          Schul-Arbeitsblock (15 min) wird auf den neuen Standard gehoben – keine Mini-Lernblöcke mehr.
  */
 export function migrate(persisted: unknown, version: number): Partial<AppData> {
   const data = (persisted ?? {}) as Partial<AppData>;
@@ -130,6 +150,9 @@ export function migrate(persisted: unknown, version: number): Partial<AppData> {
     data.tasks = data.tasks.map((t) =>
       t.description === GOAL_SESSION_DESCRIPTION && t.schedule && !t.schedule.auto ? { ...t, schedule: { ...t.schedule, auto: true } } : t,
     );
+  }
+  if (version < 4 && data.settings?.school?.minBlockMin === OLD_DEFAULT_MIN_BLOCK) {
+    data.settings = { ...data.settings, school: { ...data.settings.school, minBlockMin: defaultSchoolSettings().minBlockMin } };
   }
   return data;
 }

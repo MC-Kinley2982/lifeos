@@ -1,12 +1,13 @@
 import { ENERGY_LABEL, TIME_OF_DAY_LABEL } from '../../domain/labels';
 import { diffDays, formatDuration, minutesSinceMidnight, relativeDayLabel, toDateKey, toHHMM, weekDays } from '../../domain/time';
-import type { DateKey, DaySchedule, EnergyLevel, ScheduleBlock, Task, TaskEnergy } from '../../domain/types';
+import type { DateKey, DaySchedule, EnergyLevel, ProtectedSlot, ScheduleBlock, Task, TaskEnergy } from '../../domain/types';
 import { studyProgress, studyWindow } from '../school/exams';
 import { deadlineMoment, homeworkOpenMinutes, isHomeworkOverdue } from '../school/homework';
 import { subjectById, subjectLabel } from '../school/timetable';
 import { energyFits, estimateEnergy, requiredEnergy } from './energy';
 import { timeOfDayAt } from './freeTime';
 import { computeGoalProgress } from './goals';
+import { protectedAt } from './protected';
 import { buildDaySchedule, WORK_KINDS } from './schedule';
 import { priorityScore, urgencyScore } from './scoring';
 import type { NowSuggestion, PlannerData, SuggestionItem } from './types';
@@ -52,26 +53,37 @@ export function suggestNow(data: PlannerData, now: Date): NowSuggestion {
   const currentExam = currentBlock?.kind === 'study' ? data.exams.find((e) => e.id === currentBlock.sourceId) : undefined;
   const plannedWorkNow = !!(currentTask || currentHomework || currentExam);
 
+  // Feste Blöcke und geschützte Zeiträume (z. B. Morgenroutine) überspringen – Vorschläge gelten erst danach.
+  const guarded = schedule.protectedSlots ?? [];
   let fromMinute = nowMin;
-  if (currentBlock && !plannedWorkNow) {
-    let guard = 0;
-    let block: ScheduleBlock | undefined = currentBlock;
-    while (block && !WORK_KINDS.includes(block.kind) && guard++ < 20) {
-      fromMinute = block.end;
-      block = busyNow(fromMinute);
+  let protectedNow: ProtectedSlot | undefined;
+  if (!plannedWorkNow) {
+    for (let guard = 0; guard < 40; guard++) {
+      const block: ScheduleBlock | undefined = busyNow(fromMinute);
+      if (block && !WORK_KINDS.includes(block.kind)) {
+        fromMinute = block.end;
+        continue;
+      }
+      const p = protectedAt(guarded, fromMinute);
+      if (!p) break;
+      protectedNow ??= p;
+      fromMinute = p.end;
     }
   }
 
   const nextBlock = schedule.blocks
     .filter((b) => b.blocksFreeTime && b.kind !== 'sleep' && !WORK_KINDS.includes(b.kind) && b.start >= fromMinute)
     .sort((a, b) => a.start - b.start)[0];
-  const untilMin = Math.min(nextBlock?.start ?? schedule.awake.end, schedule.awake.end);
+  const nextProtected = guarded.find((p) => p.start > fromMinute);
+  const untilMin = Math.min(nextBlock?.start ?? schedule.awake.end, nextProtected?.start ?? schedule.awake.end, schedule.awake.end);
   const availableMin = Math.max(0, untilMin - fromMinute);
   const energy = estimateEnergy(data, schedule, fromMinute);
 
   const lines: string[] = [];
   if (currentBlock && !plannedWorkNow) {
     lines.push(`Gerade: ${currentBlock.title} bis ${toHHMM(currentBlock.end)}. Frei ab ${toHHMM(fromMinute)}:`);
+  } else if (protectedNow) {
+    lines.push(`Gerade: ${protectedNow.name} (geschützte Zeit) bis ${toHHMM(protectedNow.end)}. Danach ab ${toHHMM(fromMinute)}:`);
   }
 
   // ── Laut Plan läuft gerade eine Hausaufgabe oder Lerneinheit ─
@@ -101,7 +113,11 @@ export function suggestNow(data: PlannerData, now: Date): NowSuggestion {
       laterForEnergy: [],
     };
   }
-  lines.push(availabilityLine(availableMin, nextBlock, untilMin, schedule));
+  lines.push(
+    nextProtected && nextProtected.start === untilMin && untilMin < schedule.awake.end
+      ? `Du hast ${formatDuration(availableMin)} bis ${nextProtected.name} (${toHHMM(nextProtected.start)}).`
+      : availabilityLine(availableMin, nextBlock, untilMin, schedule),
+  );
   lines.push(energyLine(energy.level));
 
   // ── Laut Plan läuft gerade eine Aufgabe ────────────────────

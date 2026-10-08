@@ -1,5 +1,5 @@
-import { AlarmClock, CalendarClock, ClipboardList, Moon, Pause, Play, Sparkles, Undo2 } from 'lucide-react';
-import { formatDuration, toHHMM } from '../../domain/time';
+import { AlarmClock, CalendarClock, ClipboardList, Lock, Moon, Pause, Play, Sparkles, Undo2 } from 'lucide-react';
+import { formatDuration, subtractSlots, toHHMM, totalMinutes } from '../../domain/time';
 import type { DateKey, DaySchedule, ID, ScheduleBlock, Task, TimeSlot } from '../../domain/types';
 import { subjectById, subjectLabel } from '../../services/school/timetable';
 import type { BlockOwner } from '../../store/types';
@@ -111,6 +111,9 @@ export function Timeline({ schedule, date, today, nowMin, onPlan, onOpenTask, on
             const dur = entry.slot.end - entry.slot.start;
             const future = isToday ? entry.slot.end > nowMin : editable;
             const past = isToday && entry.slot.end <= nowMin;
+            // Geschützte Zeit (z. B. Morgenroutine) ist frei, wird aber nie automatisch verplant.
+            const guards = (schedule.protectedSlots ?? []).filter((p) => p.start < entry.slot.end && p.end > entry.slot.start);
+            const plannableMin = totalMinutes(subtractSlots([entry.slot], guards));
             return (
               <li key={`free-${entry.slot.start}`} className={cn('flex gap-3 py-1', past && 'opacity-40')}>
                 <span className="w-11 shrink-0 pt-2 text-right text-xs text-ink-faint tabular">{toHHMM(entry.slot.start)}</span>
@@ -118,8 +121,13 @@ export function Timeline({ schedule, date, today, nowMin, onPlan, onOpenTask, on
                 <div className="flex flex-1 items-center justify-between gap-2 rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-400/[0.04] px-3 py-2">
                   <span className="text-xs text-emerald-300/90">
                     <span className="font-medium">Frei</span> · {formatDuration(dur)}
+                    {guards.length > 0 && (
+                      <span className="ml-1.5 inline-flex items-center gap-1 text-ink-faint" title="Hier plant LifeOS nichts automatisch ein">
+                        <Lock size={10} /> {guards[0].name}
+                      </span>
+                    )}
                   </span>
-                  {future && dur >= minSlot && (
+                  {future && plannableMin >= minSlot && (
                     <button type="button" onClick={onPlan} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-emerald-300/80 hover:bg-emerald-400/10">
                       <Sparkles size={12} /> Planen
                     </button>

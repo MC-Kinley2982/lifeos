@@ -17,6 +17,7 @@ import { HomeworkCaptureSheet } from '../school/HomeworkCaptureSheet';
 import { HomeworkForm } from '../school/HomeworkForm';
 import { SchoolTodayCard } from '../school/SchoolTodayCard';
 import { TaskForm } from '../tasks/TaskForm';
+import { TodayTodosCard } from '../todos/TodayTodosCard';
 import { DayHeader } from './DayHeader';
 import { DayStateSheet } from './DayStateSheet';
 import { EnergySheet } from './EnergySheet';
@@ -111,7 +112,8 @@ export function TodayPage({ dateParam }: { dateParam?: string }) {
         </button>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] lg:items-start">
+      {/* minmax(0,1fr): lange Titel werden gekürzt, statt die Seite auf dem Handy breiter als den Bildschirm zu machen. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] lg:items-start">
         <div className="order-3 lg:order-none lg:row-span-4">
           <Timeline
             schedule={schedule}
@@ -122,6 +124,9 @@ export function TodayPage({ dateParam }: { dateParam?: string }) {
             onOpenTask={setEditing}
             onOpenBlock={(owner, blockId) => setSchool({ kind: 'block', owner, blockId })}
           />
+        </div>
+        <div className="order-1 lg:order-none">
+          <TodayTodosCard date={date} today={today} />
         </div>
         <div className="order-1 lg:order-none">
           <TodayTasks date={date} today={today} onOpenTask={setEditing} />

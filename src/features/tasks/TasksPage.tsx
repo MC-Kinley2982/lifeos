@@ -29,7 +29,9 @@ function smartSort(a: Task, b: Task): number {
 export function TasksPage() {
   const now = useNow();
   const today = toDateKey(now);
-  const tasks = useAppStore((s) => s.tasks);
+  const allTasks = useAppStore((s) => s.tasks);
+  // Geplante To-dos werden in der To-do-Liste verwaltet – hier nicht doppelt.
+  const tasks = useMemo(() => allTasks.filter((t) => !t.todoId), [allTasks]);
   const [filter, setFilter] = useState<Filter>('open');
   const [editing, setEditing] = useState<Task | 'new' | null>(null);
   const [planning, setPlanning] = useState(false);

@@ -175,11 +175,60 @@ export interface PlanningSettings {
   energyRequirement: Record<TaskEnergy, EnergyLevel>;
   /** Standard-Sitzungslänge, wenn Ziele automatisch eingeplant werden. */
   defaultGoalSessionMin: number;
+  /**
+   * Geschützte Zeiträume (z. B. Morgenroutine, Familienzeit): Hier plant LifeOS nie automatisch
+   * Aufgaben, Hausaufgaben, Lernzeit oder Ziele ein. Feste Termine und Routinen bleiben unberührt.
+   */
+  protectedPeriods: ProtectedPeriod[];
+}
+
+/**
+ * Zeitraum, der für die automatische Planung tabu ist.
+ * Die freie Zeit darin bleibt freie Zeit – sie wird nur nicht verplant.
+ */
+export interface ProtectedPeriod {
+  id: ID;
+  /** z. B. "Morgenroutine", "Abendroutine", "Familienzeit" */
+  name: string;
+  enabled: boolean;
+  weekdays: Weekday[];
+  /** Beginn: ab dem Aufstehen (Aufstehzeit des jeweiligen Tages) oder zu einer festen Uhrzeit. */
+  from: { at: 'wake' } | { at: 'time'; time: TimeHHMM };
+  /** Ende: feste Uhrzeit, Dauer ab Beginn oder bis zum Schlafengehen. */
+  until: { at: 'time'; time: TimeHHMM } | { at: 'duration'; minutes: number } | { at: 'bedtime' };
 }
 
 export interface UiSettings {
   /** 0 = Montag, 6 = Sonntag */
   weekStartsOn: Weekday;
+  /** Erledigte To-dos ausblenden (sie bleiben gespeichert). */
+  hideCompletedTodos: boolean;
+}
+
+// ─── Integrationen ───────────────────────────────────────────
+
+/** Was LifeOS (nur auf Wunsch) in Google Kalender einträgt. */
+export type GoogleSyncCategory = 'events' | 'homework' | 'study' | 'todos' | 'routines';
+
+/** Erinnerung für Einträge, die LifeOS in Google Kalender anlegt. */
+export type GoogleReminder = { type: 'calendarDefault' } | { type: 'none' } | { type: 'minutes'; minutes: number };
+
+export interface GoogleCalendarSettings {
+  /** Verbundenes Google-Konto – nur zur Anzeige. Zugriffsrechte bleiben auf dem jeweiligen Gerät. */
+  accountEmail?: string;
+  /** Kalender, aus dem gelesen und in den geschrieben wird. Ohne = nicht verbunden. */
+  calendarId?: string;
+  calendarName?: string;
+  /** Google-Termine in LifeOS anzeigen; sie blockieren Zeit wie feste Termine. */
+  importEvents: boolean;
+  /** Welche LifeOS-Inhalte in Google Kalender eingetragen werden – standardmäßig nichts. */
+  push: Record<GoogleSyncCategory, boolean>;
+  /** Erinnerung für eingetragene Einträge (To-dos können eine eigene haben). */
+  reminder: GoogleReminder;
+}
+
+export interface IntegrationSettings {
+  googleCalendar: GoogleCalendarSettings;
 }
 
 export interface SchoolSettings {
@@ -234,6 +283,7 @@ export interface Settings {
   planning: PlanningSettings;
   school: SchoolSettings;
   ui: UiSettings;
+  integrations: IntegrationSettings;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -316,7 +366,51 @@ export interface Task {
   schedule?: TaskSchedule;
   /** Tatsächlich investierte Zeit (optional, sonst zählt die Schätzung). */
   actualMin?: number;
+  /** Entstanden aus einem To-do ("Planen") – Erledigt-Status läuft mit dem To-do gemeinsam. */
+  todoId?: ID;
   completedAt?: ISODateTime;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+}
+
+// ─────────────────────────────────────────────────────────────
+// To-dos – schnelle persönliche Liste, unabhängig von der Planung
+// ─────────────────────────────────────────────────────────────
+
+/** Wann: an einem bestimmten Tag, irgendwann in einer Woche oder später (ohne Datum). */
+export type TodoHorizon = 'day' | 'week' | 'later';
+
+export interface TodoReminder {
+  /** Minuten vor der Uhrzeit des To-dos (0 = zur Uhrzeit). */
+  minutesBefore: number;
+}
+
+/**
+ * Ein To-do ist nur "Das möchte ich erledigen" – es blockiert keine Zeit und wird nie
+ * automatisch geplant. Erst "Planen" verknüpft es mit einer Aufgabe, für die LifeOS Zeit sucht.
+ */
+export interface Todo {
+  id: ID;
+  title: string;
+  completed: boolean;
+  completedAt?: ISODateTime;
+  horizon: TodoHorizon;
+  /** horizon "day": der Tag · horizon "week": erster Tag der Woche · "later": keins. */
+  date?: DateKey;
+  /** Optionale Uhrzeit (z. B. für eine Erinnerung). */
+  time?: TimeHHMM;
+  priority?: Priority;
+  note?: string;
+  /** Standardmäßig keine Erinnerung. Zugestellt wird sie über Google Kalender. */
+  reminder?: TodoReminder;
+  /** Nur auf ausdrücklichen Wunsch in Google Kalender eintragen. */
+  googleCalendarSync?: boolean;
+  /** Von LifeOS angelegter Google-Termin (nach der ersten Synchronisierung). */
+  googleCalendarEventId?: string;
+  /** Verknüpfte Aufgabe nach "Planen" – ohne bleibt es ein reines To-do. */
+  taskId?: ID;
+  /** Sortierung innerhalb der Liste. */
+  order: number;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
 }
@@ -549,6 +643,11 @@ export interface TimeSlot {
   end: number;
 }
 
+export interface ProtectedSlot extends TimeSlot {
+  periodId: ID;
+  name: string;
+}
+
 export type DayStateOrigin = 'manual' | 'specialDay' | 'vacation' | 'default';
 
 export interface ResolvedDayState {
@@ -582,6 +681,8 @@ export interface DaySchedule {
   /** Ausgelassene Quellen (pausiert durch Zustand oder manuell). */
   inactive: Array<{ sourceKey: SourceKey; title: string; reason: 'state' | 'skipped' }>;
   freeSlots: TimeSlot[];
+  /** Geschützte Zeiträume dieses Tages (z. B. Morgenroutine) – hier wird nie automatisch geplant. */
+  protectedSlots: ProtectedSlot[];
   totalFreeMin: number;
   /** So viel Zeit muss an diesem Tag frei bleiben (Einstellung bzw. "Mehr Freizeit"-Wunsch). */
   requiredFreeMin: number;

@@ -10,6 +10,7 @@ function SummaryList({ s }: { s: DataSummary }) {
     ['Routinen', s.routines],
     ['Termine', s.events],
     ['Aufgaben', s.tasks],
+    ['To-dos', s.todos],
     ['Ziele', s.goals],
     ['Fächer', s.subjects],
     ['Hausaufgaben', s.homework],
@@ -75,7 +76,7 @@ export function LinkDecisionDialog() {
           </div>
           <SummaryList s={decision.remote} />
           <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-            Die Daten auf diesem Gerät werden ersetzt – vorher wird automatisch eine Sicherung gespeichert (unter „Konto & Sync“ herunterladbar).
+            Die Daten auf diesem Gerät werden ersetzt – vorher wird automatisch eine Sicherung gespeichert (unter „Konto & Integrationen“ herunterladbar).
           </p>
           <Button variant="secondary" className="mt-3" disabled={busy} onClick={() => void choose('cloud')}>
             Cloud-Daten verwenden

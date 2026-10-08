@@ -12,7 +12,7 @@ const LABEL = {
   disabled: { dot: 'bg-white/30', text: 'Nur lokal' },
 } as const;
 
-/** 🟢 Synchronisiert · 🟡 Synchronisiere … · 🔴 Offline – führt zu "Konto & Sync". */
+/** 🟢 Synchronisiert · 🟡 Synchronisiere … · 🔴 Offline – führt zu "Konto & Integrationen". */
 export function SyncIndicator({ className, compact }: { className?: string; compact?: boolean }) {
   const status = useCloud((s) => s.status);
   const pending = useCloud((s) => s.pending);

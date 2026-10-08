@@ -35,6 +35,16 @@ npm run preview    # Produktions-Build lokal ansehen
   - Blöcke lassen sich verschieben; verschobene Blöcke bleiben, wo du sie hinlegst.
 - **Konto & Cloud-Sync (optional):** Registrierung/Login mit E-Mail + Passwort, dieselben Daten auf PC und iPhone,
   offline weiter nutzbar, Statusanzeige 🟢 Synchronisiert · 🟡 Synchronisiere … · 🔴 Offline.
+- **Freizeit-Schutz & geschützte Zeiten:** Mindest-Freizeit pro Tag, Planungsanteil, Tage mit viel Freizeit
+  (Wochenende) bevorzugt, jede Aktivität höchstens einmal pro Tag, „Mehr Freizeit“. Geschützte Zeiträume
+  (*Mein Alltag → Planung → Geschützte Zeiten*, z. B. Morgenroutine „ab Aufstehen bis 07:45“, Familienzeit)
+  werden von keinem Planer genutzt – auch keine kleinen Lücken zwischen Routine-Punkten.
+- **To-dos:** schnelle persönliche Liste (Heute · Diese Woche · Später), mit einem Tipp abhaken, erledigte bleiben
+  gespeichert. Ein To-do blockiert keine Zeit; erst „Planen“ macht daraus eine Aufgabe, für die LifeOS einen freien
+  Zeitraum sucht (Reihenfolge: Termine → geschützte Zeiten/Routinen → Schule → Hausaufgaben → Aufgaben →
+  geplante To-dos → Ziele → freie Zeit). Synchronisiert über dieselbe `lifeos_records`-Tabelle (Sammlung `todos`).
+- **Google Kalender (optional):** Google-Termine lesen (blockieren Zeit) und – nur auf Wunsch – Termine,
+  Hausaufgaben, Lernzeiten, markierte To-dos oder Routinen eintragen (für die normalen Google-Benachrichtigungen).
 
 ## Cloud-Synchronisierung einrichten (Supabase)
 
@@ -60,13 +70,15 @@ npm run preview    # Produktions-Build lokal ansehen
 | `VITE_SUPABASE_URL` | Projekt-URL, z. B. `https://abcd.supabase.co` |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Öffentlicher Client-Schlüssel (alternativ `VITE_SUPABASE_ANON_KEY`) |
 | `VITE_MOCK_CLOUD` | Nur Entwicklung (`.env.mock`): simulierte Cloud im Dev-Server |
+| `VITE_GOOGLE_CLIENT_ID` | Optional: OAuth-Client-ID (Webanwendung) für Google Kalender – öffentlich, kein Secret |
 
 Ohne Supabase-Werte läuft LifeOS genau wie V1 rein lokal.
 
 ### Datenbank
 
 Eine Tabelle **`public.lifeos_records`** – eine Zeile pro Eintrag (Einstellungen, Routine, Termin, Aufgabe,
-Ziel, Tageszustand, Urlaub, Fach, Stunde, Hausaufgabe, Test):
+To-do, Ziel, Tageszustand, Urlaub, Fach, Stunde, Hausaufgabe, Test). Neue Bereiche wie die To-dos brauchen
+keine Migration – sie sind einfach eine weitere `collection` mit derselben Row Level Security:
 
 | Spalte | Inhalt |
 | --- | --- |
@@ -96,7 +108,7 @@ Zeilen; anonyme Zugriffe sind gesperrt. Ein Trigger verhindert, dass ältere St�
 
 ### PC ↔ iPhone testen
 
-1. PC: App öffnen → *Mein Alltag → Konto & Sync* → registrieren (E-Mail bestätigen) → anmelden. Status 🟢.
+1. PC: App öffnen → *Mein Alltag → Konto & Integrationen* → registrieren (E-Mail bestätigen) → anmelden. Status 🟢.
 2. iPhone: Live-Seite in Safari öffnen → *Teilen → Zum Home-Bildschirm* → in der installierten App
    „Ich habe schon ein Konto“ → anmelden. Die Daten vom PC erscheinen.
 3. PC: Hausaufgabe eintragen. iPhone: App öffnen (oder *Jetzt synchronisieren*) → die Hausaufgabe ist da.
@@ -105,6 +117,39 @@ Zeilen; anonyme Zugriffe sind gesperrt. Ein Trigger verhindert, dass ältere St�
 
 Ohne Supabase lässt sich das lokal durchspielen: `npm run dev:mock -- --host 127.0.0.1`, dann
 `http://127.0.0.1:5173` („PC“) und `http://localhost:5173` („iPhone“) – zwei Ursprünge mit getrennten Daten.
+
+## Google Kalender einrichten (optional)
+
+LifeOS meldet sich direkt im Browser über **Google Identity Services** an (OAuth-Token-Modell, kein Server,
+kein Client-Secret). Das Zugriffstoken bleibt auf dem jeweiligen Gerät (sessionStorage, ca. 1 h gültig) und wird
+nie mit Supabase synchronisiert. Synchronisiert werden nur die Einstellungen (Konto, Kalender, was übertragen wird).
+
+1. https://console.cloud.google.com → neues Projekt (z. B. „LifeOS“).
+2. *APIs & Dienste → Bibliothek* → **Google Calendar API** aktivieren.
+3. *OAuth-Zustimmungsbildschirm* (Google Auth Platform → Branding/Zielgruppe): Typ **Extern**, App-Name, Support-
+   E-Mail. Unter *Zielgruppe* bleibt die App im Modus **Testen** → dein Google-Konto als **Testnutzer** hinzufügen.
+   Bereiche (Datenzugriff): `…/auth/calendar.calendarlist.readonly` und `…/auth/calendar.events`.
+4. *Clients → Client erstellen* → Typ **Webanwendung**. *Autorisierte JavaScript-Quellen*:
+   `https://mc-kinley2982.github.io` und für die Entwicklung `http://localhost:5173` / `http://localhost:5180`
+   (Weiterleitungs-URIs werden nicht gebraucht). **Kein Client-Secret verwenden.**
+5. Die Client-ID (`…apps.googleusercontent.com`) als `VITE_GOOGLE_CLIENT_ID` eintragen – lokal in `.env.local`,
+   für die Live-Seite als GitHub-Repository-Variable (wie bei Supabase) – und neu veröffentlichen.
+6. In LifeOS: *Mein Alltag → Konto & Integrationen → Google Kalender → Mit Google verbinden*.
+   Im Testmodus zeigt Google den Hinweis „Google hat diese App nicht überprüft“ → *Weiter*.
+
+So funktioniert der Abgleich (Zeitraum: heute + 28 Tage):
+
+- **Lesen:** Termine des gewählten Kalenders erscheinen in LifeOS (Termine-Seite, Tagesplan) und blockieren Zeit;
+  als „frei“ markierte Google-Termine nicht. Sie sind in LifeOS nur lesbar.
+- **Schreiben:** nur die eingeschalteten Bereiche (Standard: nichts). Jeder LifeOS-Eintrag hat eine stabile
+  Google-Event-ID (aus seinem LifeOS-Schlüssel abgeleitet) – wiederholte Synchronisierung, auch von mehreren
+  Geräten, erzeugt keine Duplikate. Geänderte Einträge werden aktualisiert.
+- **Löschen:** nur Einträge mit der privaten Markierung `lifeos=1`, also von LifeOS angelegte. Persönliche
+  Google-Termine werden nie geändert oder gelöscht.
+- **Automatisch** nur, solange das Gerät angemeldet ist (beim Start, nach Änderungen, alle 10 min). Danach genügt
+  ein Tipp auf „Jetzt synchronisieren“. Offline läuft LifeOS normal weiter.
+- To-dos werden nur übertragen, wenn „To-dos mit Kalendertermin“ erlaubt **und** beim To-do „In Google Kalender
+  eintragen“ eingeschaltet ist. Standard-Erinnerung für To-dos: keine.
 
 ## Veröffentlichung (GitHub Pages)
 

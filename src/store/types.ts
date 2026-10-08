@@ -12,10 +12,12 @@ import type {
   EnergyTimeWindow,
   Exam,
   Goal,
+  GoogleCalendarSettings,
   Homework,
   ID,
   Meal,
   PlanningSettings,
+  ProtectedPeriod,
   Routine,
   SchoolBlock,
   SchoolSettings,
@@ -28,6 +30,7 @@ import type {
   Task,
   TaskSchedule,
   TimetableEntry,
+  Todo,
   UiSettings,
   UserProfile,
   Vacation,
@@ -43,6 +46,7 @@ import type {
   SubjectInput,
   TaskInput,
   TimetableEntryInput,
+  TodoInput,
 } from '../domain/factories';
 import type { PlanItem } from '../services/planner/types';
 import type { SchoolPlanResult } from '../services/school/types';
@@ -62,6 +66,7 @@ export interface AppData {
   timetable: TimetableEntry[];
   homework: Homework[];
   exams: Exam[];
+  todos: Todo[];
 }
 
 export type BlockOwner = { kind: 'homework'; id: ID } | { kind: 'exam'; id: ID };
@@ -118,7 +123,10 @@ export interface SettingsActions {
   updatePlanning(patch: Partial<PlanningSettings>): void;
   upsertWorkWindow(window: WorkWindow): void;
   removeWorkWindow(id: ID): void;
+  upsertProtectedPeriod(period: ProtectedPeriod): void;
+  removeProtectedPeriod(id: ID): void;
   updateUi(patch: Partial<UiSettings>): void;
+  updateGoogleCalendar(patch: Partial<GoogleCalendarSettings>): void;
 }
 
 export interface RoutineActions {
@@ -131,6 +139,22 @@ export interface EventActions {
   addEvent(input: EventInput): ID;
   updateEvent(id: ID, patch: Partial<EventInput>): void;
   removeEvent(id: ID): void;
+  /**
+   * Gelesene Google-Termine übernehmen: ersetzt alle Google-Termine im Zeitraum (from ≤ Datum < to).
+   * calendarId = null entfernt alle Google-Termine (z. B. nach dem Trennen). Ändert nichts, wenn gleich.
+   */
+  replaceGoogleEvents(calendarId: string | null, events: CalendarEvent[], range?: { from: DateKey; to: DateKey }): void;
+}
+
+export interface TodoActions {
+  addTodo(input: TodoInput): ID;
+  updateTodo(id: ID, patch: Partial<TodoInput>): void;
+  /** Abhaken bzw. wieder öffnen – das To-do bleibt gespeichert. Eine verknüpfte Aufgabe folgt. */
+  toggleTodo(id: ID): void;
+  /** Löscht das To-do samt der Aufgabe, die durch "Planen" entstanden ist. */
+  removeTodo(id: ID): void;
+  /** Nach der Google-Synchronisierung: IDs der von LifeOS angelegten Termine merken. */
+  setTodoCalendarEventIds(ids: Record<ID, string | undefined>): void;
 }
 
 export interface TaskActions {
@@ -184,6 +208,7 @@ export type AppState = AppData &
   RoutineActions &
   EventActions &
   TaskActions &
+  TodoActions &
   GoalActions &
   DailyActions &
   SchoolActions &

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleData } from '../../domain/defaults';
-import type { Homework } from '../../domain/types';
+import type { Homework, Todo } from '../../domain/types';
 import { emptyData, normalizeData } from '../../store/persistence';
 import type { AppData } from '../../store/types';
 import { createMemoryBackend } from '../cloud/memoryBackend';
@@ -150,12 +150,20 @@ describe('Fall 5: offline', () => {
 });
 
 describe('Fall 6: PC ↔ iPhone', () => {
+  const servers = new WeakMap<object, { store: MemoryCloudStore; userId: () => string }>();
+  /** Was auf dem "Server" für das Konto eines Geräts liegt. */
+  const server = (d: { engine: SyncEngine }) => {
+    const s = servers.get(d)!;
+    return s.store.dump(s.userId());
+  };
+
   async function twoDevices() {
-    const server = new MemoryCloudStore();
-    const pc = device(server, exampleData());
+    const store = new MemoryCloudStore();
+    const pc = device(store, exampleData());
     await pc.engine.signUp('josh@example.com', 'geheim123');
-    const phone = device(server, emptyData());
+    const phone = device(store, emptyData());
     await phone.engine.signIn('josh@example.com', 'geheim123');
+    for (const d of [pc, phone]) servers.set(d, { store, userId: () => d.engine.getState().session!.userId });
     return { pc, phone };
   }
 
@@ -197,6 +205,29 @@ describe('Fall 6: PC ↔ iPhone', () => {
     await phone.engine.syncNow();
     expect(pc.data.settings.profile.name).toBe('iPhone');
     expect(phone.data.settings.profile.name).toBe('iPhone');
+  });
+
+  it('To-do offline auf dem iPhone erstellt → später synchronisiert → am PC sichtbar, Abhaken kommt zurück', async () => {
+    const { pc, phone } = await twoDevices();
+    const todo: Todo = { id: 'todo-papa', title: 'Spiel für Papa suchen', completed: false, horizon: 'day', date: TODAY, order: 1, createdAt: ts, updatedAt: ts };
+
+    phone.backend.setOnline(false);
+    phone.edit((d) => ({ ...d, todos: [...d.todos, todo] }));
+    await phone.engine.syncNow();
+    expect(phone.engine.getState().status).toBe('offline');
+    expect(phone.data.todos.map((t) => t.title)).toEqual(['Spiel für Papa suchen']); // offline nutzbar
+    expect(server(phone).some((r) => r.collection === 'todos')).toBe(false);
+
+    phone.backend.setOnline(true);
+    await phone.engine.syncNow();
+    expect(server(phone).find((r) => r.collection === 'todos')).toMatchObject({ id: 'todo-papa', deleted: false });
+    await pc.engine.syncNow();
+    expect(pc.data.todos.map((t) => t.title)).toEqual(['Spiel für Papa suchen']);
+
+    pc.edit((d) => ({ ...d, todos: d.todos.map((t) => ({ ...t, completed: true, completedAt: ts })) }));
+    await pc.engine.syncNow();
+    await phone.engine.syncNow();
+    expect(phone.data.todos[0].completed).toBe(true);
   });
 
   it('übernommene Cloud-Änderungen werden nicht erneut hochgeladen', async () => {

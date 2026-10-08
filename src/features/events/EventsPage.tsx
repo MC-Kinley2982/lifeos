@@ -28,12 +28,14 @@ export function EventsPage() {
 
   const colorOf = (e: CalendarEvent) => e.color ?? categories.find((c) => c.id === e.categoryId)?.color ?? '#a1a1aa';
 
+  // Termine aus Google Kalender sind hier nur zu sehen – geändert werden sie in Google.
   const row = (e: CalendarEvent) => (
     <button
       key={e.id}
       type="button"
-      onClick={() => setEditing(e)}
-      className="flex w-full items-center gap-3 rounded-2xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.03]"
+      onClick={() => e.source === 'local' && setEditing(e)}
+      title={e.source === 'google' ? 'Aus Google Kalender – dort bearbeiten' : undefined}
+      className={cn('flex w-full items-center gap-3 rounded-2xl px-2 py-2.5 text-left transition-colors', e.source === 'local' ? 'hover:bg-white/[0.03]' : 'cursor-default')}
     >
       <span className="h-10 w-1 shrink-0 rounded-full" style={{ background: colorOf(e) }} />
       <span className="w-24 shrink-0 text-sm text-ink-muted tabular">{e.allDay ? 'Ganztägig' : `${e.start}–${e.end}`}</span>
@@ -48,7 +50,7 @@ export function EventsPage() {
               {e.location}
             </span>
           )}
-          {e.source !== 'local' && <span>aus {e.source}</span>}
+          {e.source === 'google' && <span className="text-sky-300/80">aus Google Kalender</span>}
         </span>
       </span>
     </button>

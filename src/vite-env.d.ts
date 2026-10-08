@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY?: string;
   /** Nur Entwicklung: simulierte Cloud über den Vite-Dev-Server. */
   readonly VITE_MOCK_CLOUD?: string;
+  /** Google-OAuth-Client-ID (Typ "Webanwendung", öffentlich) für Google Kalender – ohne Client-Secret. */
+  readonly VITE_GOOGLE_CLIENT_ID?: string;
 }
 
 interface ImportMeta {

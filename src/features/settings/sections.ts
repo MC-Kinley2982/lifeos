@@ -9,7 +9,7 @@ export interface SettingsSectionMeta {
 
 export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   { id: 'profil', label: 'Profil & Allgemein', description: 'Name, Wochenstart', icon: UserRound },
-  { id: 'konto', label: 'Konto & Sync', description: 'Anmelden, Geräte synchronisieren', icon: Cloud },
+  { id: 'konto', label: 'Konto & Integrationen', description: 'Geräte synchronisieren, Google Kalender', icon: Cloud },
   { id: 'schule', label: 'Schule', description: 'Schulzeit, Hausaufgaben, Lernzeit', icon: GraduationCap },
   { id: 'schlaf', label: 'Schlaf', description: 'Aufstehen & Schlafenszeit, pro Wochentag', icon: Moon },
   { id: 'mahlzeiten', label: 'Mahlzeiten', description: 'Frühstück, Mittag, Abendessen …', icon: Utensils },

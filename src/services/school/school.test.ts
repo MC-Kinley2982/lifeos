@@ -131,6 +131,8 @@ describe('Fall 2: Aufteilen, wenn ein Tag nicht reicht', () => {
     settings.planning.maxPlannedShare = 1;
     settings.school.maxSchoolShare = 1;
     settings.school.travelBeforeMin = 15;
+    // Dieser Fall testet das Aufteilen mit knappen Morgen-Lücken – ohne geschützte Morgenroutine.
+    settings.planning.protectedPeriods = [];
     const blocker: Routine = {
       id: 'blocker', name: 'Termin', categoryId: 'cat_other', color: '#888', weekdays: [2], start: '07:30', end: '21:00',
       priority: 'high', blocksFreeTime: true, enabled: true, travelBeforeMin: 0, travelAfterMin: 0, createdAt: ts, updatedAt: ts,
@@ -248,7 +250,8 @@ describe('Stabilität und manuelle Änderungen', () => {
   it('manuell verschobene Blöcke bleiben, verpasste Blöcke werden neu eingeplant', () => {
     const data = exampleData();
     const hw = homework(data, 'Ma', TUE, 45);
-    hw.deadline = { date: THU, time: '08:00', source: 'nextLesson' };
+    // Abgabe Freitag: Der Rest findet Donnerstag Platz (am Donnerstag vor der Schule ist Morgenroutine – geschützt).
+    hw.deadline = { date: FRI, time: '08:00', source: 'nextLesson' };
     hw.plannedBlocks = [
       { id: 'missed', date: TUE, start: '16:00', durationMin: 20, source: 'auto', done: false },
       { id: 'manual', date: WED, start: '17:00', durationMin: 25, source: 'manual', done: false },

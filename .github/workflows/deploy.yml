@@ -45,6 +45,8 @@ jobs:
           # Ohne diese Werte wird LifeOS rein lokal gebaut.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # Google Kalender (optional): öffentliche OAuth-Client-ID, kein Secret.
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
 
       - name: GitHub Pages konfigurieren
         uses: actions/configure-pages@v6

@@ -10,9 +10,11 @@ import { SchoolPage } from './features/school/SchoolPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { TasksPage } from './features/tasks/TasksPage';
 import { TodayPage } from './features/today/TodayPage';
+import { TodosPage } from './features/todos/TodosPage';
 import { WeekPage } from './features/week/WeekPage';
 import { LinkDecisionDialog } from './features/cloud/LinkDecisionDialog';
 import { useCloud } from './store/cloud';
+import { useGoogleCalendarSync } from './store/googleCalendar';
 import { usePlanMaintenance } from './store/schoolAutomation';
 import { useAppStore } from './store/useAppStore';
 import { Toaster } from './ui/toast';
@@ -21,6 +23,8 @@ function Page({ route }: { route: Route }) {
   switch (route.name) {
     case 'day':
       return <TodayPage key={route.params[0]} dateParam={route.params[0]} />;
+    case 'todos':
+      return <TodosPage />;
     case 'week':
       return <WeekPage dateParam={route.params[0]} />;
     case 'school':
@@ -49,6 +53,8 @@ export function App() {
   const linkPending = useCloud((s) => !!s.linkDecision);
   const route = useRoute();
   usePlanMaintenance(onboardingDone && cloudReady && !linkPending);
+  // Google Kalender nur synchronisieren, wenn verbunden und auf diesem Gerät angemeldet – nie ungefragt.
+  useGoogleCalendarSync(onboardingDone && cloudReady && !linkPending);
 
   return (
     <>

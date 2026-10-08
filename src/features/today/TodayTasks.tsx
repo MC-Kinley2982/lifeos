@@ -39,7 +39,8 @@ function sortTasks(list: Task[]): Task[] {
 
 export function TodayTasks({ date, today, onOpenTask }: { date: DateKey; today: DateKey; onOpenTask: (t: Task) => void }) {
   const tasks = useAppStore((s) => s.tasks);
-  const list = useMemo(() => sortTasks(tasksForDay(tasks, date, today)), [tasks, date, today]);
+  // Geplante To-dos stehen unter "Meine To-dos" (mit Uhrzeit) – hier nicht doppelt.
+  const list = useMemo(() => sortTasks(tasksForDay(tasks, date, today).filter((t) => !t.todoId)), [tasks, date, today]);
   const done = list.filter((t) => t.status === 'done').length;
 
   return (

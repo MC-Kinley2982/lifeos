@@ -23,16 +23,31 @@ export const createTasksSlice: SliceCreator<TasksSlice> = (set, get) => ({
 
   updateTask: (id, patch) => set((state) => ({ tasks: patchEntity(state.tasks, id, patch) })),
 
-  removeTask: (id) => set((state) => ({ tasks: removeById(state.tasks, id) })),
+  removeTask: (id) =>
+    set((state) => {
+      const todoId = state.tasks.find((t) => t.id === id)?.todoId;
+      return {
+        tasks: removeById(state.tasks, id),
+        // Das To-do bleibt – es ist danach nur nicht mehr geplant.
+        ...(todoId ? { todos: patchEntity(state.todos, todoId, { taskId: undefined }) } : {}),
+      };
+    }),
 
   toggleTaskDone: (id) =>
-    set((state) => ({
-      tasks: state.tasks.map((t) => {
-        if (t.id !== id) return t;
-        const done = t.status !== 'done';
-        return { ...t, status: done ? 'done' : 'todo', completedAt: done ? nowIso() : undefined, updatedAt: nowIso() };
-      }),
-    })),
+    set((state) => {
+      const task = state.tasks.find((t) => t.id === id);
+      if (!task) return {};
+      const done = task.status !== 'done';
+      const ts = nowIso();
+      const completedAt = done ? ts : undefined;
+      return {
+        tasks: state.tasks.map((t) => (t.id === id ? { ...t, status: done ? 'done' : 'todo', completedAt, updatedAt: ts } : t)),
+        // Geplantes To-do: Aufgabe erledigt = To-do erledigt.
+        ...(task.todoId
+          ? { todos: state.todos.map((t) => (t.id === task.todoId ? { ...t, completed: done, completedAt, updatedAt: ts } : t)) }
+          : {}),
+      };
+    }),
 
   setTaskSchedule: (id, schedule) => set((state) => ({ tasks: patchEntity(state.tasks, id, { schedule }) })),
 
