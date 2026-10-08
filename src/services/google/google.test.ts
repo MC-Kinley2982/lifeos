@@ -67,11 +67,14 @@ function makeData(push: Partial<GoogleCalendarSettings['push']> = {}): GoogleSyn
   };
 }
 
+/** Lokale Uhrzeit als Zeitpunkt, wie Google ihn liefert – unabhängig von der Zeitzone des Rechners (CI läuft in UTC). */
+const local = (date: DateKey, time: string) => new Date(`${date}T${time}:00`).toISOString();
+
 const ownEvent: GEvent = {
   id: 'privat123',
   summary: 'Zahnarzt',
-  start: { dateTime: `${TODAY}T16:00:00+02:00` },
-  end: { dateTime: `${TODAY}T17:00:00+02:00` },
+  start: { dateTime: local(TODAY, '16:00') },
+  end: { dateTime: local(TODAY, '17:00') },
 };
 
 describe('Google Kalender: Übertragen', () => {
@@ -183,7 +186,7 @@ describe('Google Kalender: Lesen', () => {
 
   it('verteilt Termine über Mitternacht auf beide Tage und ganztägige auf jeden Tag', () => {
     const range = { from: TODAY, to: '2026-10-20' };
-    const night: GEvent = { id: 'n', summary: 'Nachtzug', start: { dateTime: `${TODAY}T22:00:00+02:00` }, end: { dateTime: '2026-10-07T02:00:00+02:00' } };
+    const night: GEvent = { id: 'n', summary: 'Nachtzug', start: { dateTime: local(TODAY, '22:00') }, end: { dateTime: local('2026-10-07', '02:00') } };
     const trip: GEvent = { id: 't', summary: 'Ausflug', start: { date: '2026-10-08' }, end: { date: '2026-10-10' } };
     const mapped: CalendarEvent[] = mapGoogleEvents('cal', [night, trip], range, 'cat_other');
     expect(mapped.map((e) => `${e.title} ${e.date} ${e.allDay ? 'ganztägig' : `${e.start}-${e.end}`}`)).toEqual([
