@@ -5,9 +5,32 @@ import type { PlannerData } from '../planner/types';
 import { nextLessonOf, subjectById } from './timetable';
 import type { Moment } from './types';
 
-/** Standard-Dauer: fachspezifischer Wert, sonst die allgemeine Ø-Hausaufgabenzeit. */
+export interface LearnedHomeworkTime {
+  /** Gleitender Durchschnitt, auf 5 Minuten gerundet. */
+  minutes: number;
+  /** Aus so vielen erledigten Hausaufgaben. */
+  samples: number;
+}
+
+/**
+ * Gelernte Hausaufgabenzeit eines Fachs: Durchschnitt der tatsächlich gebrauchten Minuten der letzten
+ * erledigten Hausaufgaben (Anzahl und Mindestmenge in den Schul-Einstellungen). Null, solange zu wenig Werte da sind.
+ */
+export function learnedHomeworkMinutes(data: PlannerData, subjectId: ID): LearnedHomeworkTime | null {
+  const s = data.settings.school;
+  if (!s.learnHomeworkTime) return null;
+  const recent = data.homework
+    .filter((h) => h.subjectId === subjectId && h.status === 'done' && (h.actualMinutes ?? 0) > 0)
+    .sort((a, b) => (b.completedAt ?? b.updatedAt).localeCompare(a.completedAt ?? a.updatedAt))
+    .slice(0, Math.max(1, s.homeworkLearnSamples));
+  if (recent.length === 0 || recent.length < Math.max(1, s.homeworkLearnMinSamples)) return null;
+  const avg = recent.reduce((sum, h) => sum + h.actualMinutes!, 0) / recent.length;
+  return { minutes: Math.max(5, Math.round(avg / 5) * 5), samples: recent.length };
+}
+
+/** Standard-Dauer: gelernter Fach-Durchschnitt, sonst der Startwert des Fachs, sonst die allgemeine Ø-Hausaufgabenzeit. */
 export function defaultHomeworkMinutes(data: PlannerData, subjectId: ID): number {
-  return subjectById(data, subjectId)?.homeworkMinutes ?? data.settings.school.defaultHomeworkMinutes;
+  return learnedHomeworkMinutes(data, subjectId)?.minutes ?? subjectById(data, subjectId)?.homeworkMinutes ?? data.settings.school.defaultHomeworkMinutes;
 }
 
 /**

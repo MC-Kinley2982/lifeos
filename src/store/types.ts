@@ -13,6 +13,7 @@ import type {
   Exam,
   Goal,
   GoogleCalendarSettings,
+  Grade,
   Homework,
   ID,
   Meal,
@@ -41,6 +42,7 @@ import type {
   EventInput,
   ExamInput,
   GoalInput,
+  GradeInput,
   HomeworkInput,
   RoutineInput,
   SubjectInput,
@@ -67,6 +69,7 @@ export interface AppData {
   homework: Homework[];
   exams: Exam[];
   todos: Todo[];
+  grades: Grade[];
 }
 
 export type BlockOwner = { kind: 'homework'; id: ID } | { kind: 'exam'; id: ID };
@@ -94,6 +97,11 @@ export interface SchoolActions {
   toggleSchoolBlockDone(owner: BlockOwner, blockId: ID): void;
   /** Ergebnis der automatischen Schulplanung übernehmen. */
   applySchoolPlan(result: SchoolPlanResult): void;
+  /** Tatsächlich gebrauchte Zeit einer erledigten Hausaufgabe festhalten (undefined = entfernen). */
+  setHomeworkActualMinutes(id: ID, minutes: number | undefined): void;
+  addGrade(input: GradeInput): ID;
+  updateGrade(id: ID, patch: Partial<GradeInput>): void;
+  removeGrade(id: ID): void;
 }
 
 export interface SettingsActions {

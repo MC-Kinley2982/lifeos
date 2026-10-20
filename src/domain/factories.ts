@@ -6,6 +6,7 @@ import type {
   DateKey,
   Exam,
   Goal,
+  Grade,
   Homework,
   Meal,
   Routine,
@@ -32,6 +33,7 @@ export type SubjectInput = Omit<Subject, 'id' | 'createdAt' | 'updatedAt'>;
 export type TimetableEntryInput = Omit<TimetableEntry, 'id' | 'createdAt' | 'updatedAt'>;
 export type HomeworkInput = Omit<Homework, 'id' | 'createdAt' | 'updatedAt'>;
 export type ExamInput = Omit<Exam, 'id' | 'createdAt' | 'updatedAt'>;
+export type GradeInput = Omit<Grade, 'id' | 'createdAt' | 'updatedAt'>;
 /** Neues To-do: Titel und "wann" reichen, alles andere ist optional. */
 export type TodoInput = Omit<Todo, 'id' | 'createdAt' | 'updatedAt' | 'order' | 'completed' | 'completedAt'>;
 

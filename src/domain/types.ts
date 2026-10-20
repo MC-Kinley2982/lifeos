@@ -203,6 +203,8 @@ export interface UiSettings {
   weekStartsOn: Weekday;
   /** Erledigte To-dos ausblenden (sie bleiben gespeichert). */
   hideCompletedTodos: boolean;
+  /** Schnelleingabe erkennt Tag, Uhrzeit, Dauer, Wiederholung und Wichtigkeit im Text ("morgen 17 Uhr …"). */
+  smartQuickAdd: boolean;
 }
 
 // ─── Integrationen ───────────────────────────────────────────
@@ -269,6 +271,30 @@ export interface SchoolSettings {
   defaultStudySessionMin: number;
   /** Höchstens so viel Lernzeit pro Tag und Test. */
   maxStudyMinPerDay: number;
+  /** Hausaufgabenzeit pro Fach aus den tatsächlich gebrauchten Minuten lernen. */
+  learnHomeworkTime: boolean;
+  /** Nach dem Erledigen fragen, wie lange es gedauert hat. */
+  askActualHomeworkTime: boolean;
+  /** Gleitender Durchschnitt über so viele der letzten Hausaufgaben eines Fachs … */
+  homeworkLearnSamples: number;
+  /** … sobald mindestens so viele Werte vorliegen. */
+  homeworkLearnMinSamples: number;
+  /** Notenarten (Klassenarbeit, Test, Mündlich …) mit Gewicht. */
+  gradeTypes: GradeType[];
+  /**
+   * weighted = jede Note zählt mit dem Gewicht ihrer Art (Klassenarbeit doppelt …),
+   * byType   = erst Durchschnitt je Art, dann diese nach Gewicht als Anteil (z. B. schriftlich 50 % / mündlich 50 %).
+   */
+  gradeAverageMode: 'weighted' | 'byType';
+  /** Wert von Plus/Minus, z. B. 0,3 → "2-" = 2,3 und "2+" = 1,7. */
+  gradeTendencyStep: number;
+}
+
+export interface GradeType {
+  id: ID;
+  name: string;
+  /** Gewicht (Modus weighted) bzw. Anteil (Modus byType). */
+  weight: number;
 }
 
 export interface Settings {
@@ -422,6 +448,8 @@ export interface Todo {
   taskId?: ID;
   /** Optionale Wiederholung – braucht einen festen Tag. */
   repeat?: TodoRepeat;
+  /** Geschätzte Dauer (z. B. aus "… 45 min") – Vorschlag für "Planen". */
+  estimatedMin?: number;
   /** Beim Abhaken angelegtes nächstes Vorkommen (wird beim Wieder-Öffnen zurückgenommen, solange unverändert). */
   repeatNextId?: ID;
   /** Sortierung innerhalb der Liste. */
@@ -526,7 +554,27 @@ export interface Homework {
   deadline: HomeworkDeadline;
   status: TaskStatus;
   plannedBlocks: SchoolBlock[];
+  /** Tatsächlich gebrauchte Zeit (optional, nach dem Erledigen) – daraus lernt LifeOS die Zeit pro Fach. */
+  actualMinutes?: number;
   completedAt?: ISODateTime;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+}
+
+/** Eine Note (deutsche Skala 1–6, Plus/Minus als Dezimalwert, z. B. 2- = 2,3). */
+export interface Grade {
+  id: ID;
+  subjectId: ID;
+  value: number;
+  /** Notenart aus den Schul-Einstellungen (Gewicht). */
+  typeId: ID;
+  /** Abweichendes Gewicht nur für diese Note (optional). */
+  weight?: number;
+  date: DateKey;
+  /** z. B. "1. Klassenarbeit", "Vokabeltest Lektion 3" */
+  title?: string;
+  /** Zugehöriger Test (optional). */
+  examId?: ID;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
 }

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, type ComponentType, type LazyExoticComponent
 import { AppShell } from './app/AppShell';
 import { useRoute, type Route } from './app/router';
 import { AfterSchoolPrompt } from './features/school/AfterSchoolPrompt';
+import { HomeworkTimePrompt } from './features/school/HomeworkTimePrompt';
 import { TodayPage } from './features/today/TodayPage';
 import { TodosPage } from './features/todos/TodosPage';
 import { LinkDecisionDialog } from './features/cloud/LinkDecisionDialog';
@@ -30,6 +31,7 @@ const TasksPage = lazyPage(() => import('./features/tasks/TasksPage'), 'TasksPag
 const GoalsPage = lazyPage(() => import('./features/goals/GoalsPage'), 'GoalsPage');
 const EventsPage = lazyPage(() => import('./features/events/EventsPage'), 'EventsPage');
 const RoutinesPage = lazyPage(() => import('./features/routines/RoutinesPage'), 'RoutinesPage');
+const ReviewPage = lazyPage(() => import('./features/review/ReviewPage'), 'ReviewPage');
 const SettingsPage = lazyPage(() => import('./features/settings/SettingsPage'), 'SettingsPage');
 const MorePage = lazyPage(() => import('./features/more/MorePage'), 'MorePage');
 const Welcome = lazyPage(() => import('./features/onboarding/Welcome'), 'Welcome');
@@ -75,6 +77,8 @@ function Page({ route }: { route: Route }) {
       return <EventsPage />;
     case 'routines':
       return <RoutinesPage />;
+    case 'review':
+      return <ReviewPage weekParam={route.params[0]} />;
     case 'settings':
       return <SettingsPage section={route.params[0]} />;
     case 'more':
@@ -111,6 +115,7 @@ export function App() {
         </Suspense>
       )}
       <AfterSchoolPrompt enabled={onboardingDone && cloudReady && !linkPending} />
+      <HomeworkTimePrompt />
       <LinkDecisionDialog />
       <Toaster />
     </>

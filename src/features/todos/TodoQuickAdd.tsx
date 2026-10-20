@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { DateKey } from '../../domain/types';
-import { whenToFields, type TodoWhen } from '../../services/todos/todos';
+import type { QuickTokenKind } from '../../services/nlp/quickAdd';
+import { applyQuickParse, whenToFields, type TodoWhen } from '../../services/todos/todos';
 import { useAppStore } from '../../store/useAppStore';
 import { cn } from '../../ui/cn';
+import { QuickParseChips, useQuickParse } from '../shared/QuickParseChips';
 
 const WHEN_CHIPS: Array<{ value: TodoWhen; label: string }> = [
   { value: 'today', label: 'Heute' },
@@ -12,9 +14,13 @@ const WHEN_CHIPS: Array<{ value: TodoWhen; label: string }> = [
   { value: 'later', label: 'Später' },
 ];
 
+/** Was die Texterkennung bei To-dos auswertet (Tageszeit gibt es bei To-dos nicht). */
+const TODO_KINDS: QuickTokenKind[] = ['date', 'time', 'duration', 'priority', 'repeat'];
+
 /**
  * Schnell hinzufügen: tippen, Enter – fertig. Das Feld bleibt aktiv, damit mehrere To-dos
  * hintereinander gehen. Schriftgröße 16 px, damit Safari auf dem iPhone nicht hineinzoomt.
+ * Angaben wie "morgen 17 Uhr" oder "jeden Montag" werden erkannt (Vorschau darunter, antippen = ignorieren).
  */
 export function TodoQuickAdd({ today, fixedDate, placeholder = 'To-do hinzufügen …' }: { today: DateKey; fixedDate?: DateKey; placeholder?: string }) {
   const addTodo = useAppStore((s) => s.addTodo);
@@ -22,13 +28,15 @@ export function TodoQuickAdd({ today, fixedDate, placeholder = 'To-do hinzufüge
   const [title, setTitle] = useState('');
   const [when, setWhen] = useState<TodoWhen>('today');
   const inputRef = useRef<HTMLInputElement>(null);
+  const quick = useQuickParse(title, today, TODO_KINDS);
 
   const submit = () => {
     const t = title.trim();
     if (!t) return;
     const fields = fixedDate ? whenToFields('date', today, weekStartsOn, fixedDate) : whenToFields(when, today, weekStartsOn);
-    addTodo({ title: t, ...fields });
+    addTodo(applyQuickParse({ title: t, ...fields }, quick.parse));
     setTitle('');
+    quick.reset();
     inputRef.current?.focus();
   };
 
@@ -57,6 +65,7 @@ export function TodoQuickAdd({ today, fixedDate, placeholder = 'To-do hinzufüge
           </button>
         )}
       </div>
+      <QuickParseChips className="mt-2 px-1" parse={quick.parse} ignored={quick.ignored} onToggle={quick.toggle} />
       {!fixedDate && (
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5" role="radiogroup" aria-label="Wann?">
           {WHEN_CHIPS.map((c) => (
@@ -69,6 +78,7 @@ export function TodoQuickAdd({ today, fixedDate, placeholder = 'To-do hinzufüge
               className={cn(
                 'h-9 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors',
                 when === c.value ? 'bg-violet-500/90 text-white' : 'border border-line bg-surface text-ink-muted hover:text-ink',
+                quick.parse?.horizon && 'opacity-50',
               )}
             >
               {c.label}

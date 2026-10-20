@@ -14,17 +14,19 @@ import { alpha } from '../../ui/cn';
 import { Segmented } from '../../ui/controls';
 import { ExamCard } from './ExamCard';
 import { ExamForm } from './ExamForm';
+import { GradesTab } from './GradesTab';
 import { HomeworkCaptureSheet } from './HomeworkCaptureSheet';
 import { HomeworkForm } from './HomeworkForm';
 import { HomeworkItem } from './HomeworkItem';
 import { SubjectsManager } from './SubjectsManager';
 import { TimetableEditor } from './TimetableEditor';
 
-type Tab = 'uebersicht' | 'hausaufgaben' | 'tests' | 'stundenplan' | 'faecher';
+type Tab = 'uebersicht' | 'hausaufgaben' | 'tests' | 'noten' | 'stundenplan' | 'faecher';
 const TABS: Array<{ value: Tab; label: string }> = [
   { value: 'uebersicht', label: 'Übersicht' },
   { value: 'hausaufgaben', label: 'Hausaufgaben' },
   { value: 'tests', label: 'Tests' },
+  { value: 'noten', label: 'Noten' },
   { value: 'stundenplan', label: 'Stundenplan' },
   { value: 'faecher', label: 'Fächer' },
 ];
@@ -70,12 +72,13 @@ export function SchoolPage({ tab: tabParam }: { tab?: string }) {
       />
 
       <div className="scrollbar-none -mx-4 mb-5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <Segmented<Tab> className="min-w-[520px] sm:max-w-2xl" value={tab} onChange={(t) => navigate(t === 'uebersicht' ? PATHS.school() : PATHS.school(t))} options={TABS} />
+        <Segmented<Tab> className="min-w-[600px] sm:max-w-3xl" value={tab} onChange={(t) => navigate(t === 'uebersicht' ? PATHS.school() : PATHS.school(t))} options={TABS} />
       </div>
 
       {tab === 'uebersicht' && <Overview onOpenHomework={(hw) => setSheet({ kind: 'homework', hw })} onOpenExam={(exam) => setSheet({ kind: 'exam', exam })} onCapture={() => setSheet({ kind: 'capture' })} />}
       {tab === 'hausaufgaben' && <HomeworkTab onOpen={(hw) => setSheet({ kind: 'homework', hw })} onNew={() => setSheet({ kind: 'homework' })} />}
       {tab === 'tests' && <ExamsTab onOpen={(exam) => setSheet({ kind: 'exam', exam })} onNew={() => setSheet({ kind: 'exam' })} />}
+      {tab === 'noten' && <GradesTab />}
       {tab === 'stundenplan' && <TimetableEditor />}
       {tab === 'faecher' && <SubjectsManager />}
 

@@ -1,5 +1,5 @@
-import { Bell, CalendarCheck, Check, Clock, Flag, Repeat, Sparkles, StickyNote } from 'lucide-react';
-import { relativeDayLabel } from '../../domain/time';
+import { Bell, CalendarCheck, Check, Clock, Flag, Repeat, Sparkles, StickyNote, Timer } from 'lucide-react';
+import { formatDuration, relativeDayLabel } from '../../domain/time';
 import type { DateKey, Todo } from '../../domain/types';
 import { repeatLabel } from '../../services/todos/repeat';
 import { todoDayHint } from '../../services/todos/todos';
@@ -38,7 +38,7 @@ export function TodoRow({ todo, today, onOpen }: { todo: Todo; today: DateKey; o
       </button>
       <button type="button" onClick={() => onOpen(todo)} className="flex min-w-0 flex-1 flex-col justify-center py-2.5 pr-3 text-left">
         <span className={cn('text-[15px] leading-snug break-words', todo.completed && 'text-ink-faint line-through')}>{todo.title}</span>
-        {(dayHint || todo.time || todo.reminder || todo.googleCalendarSync || planned || todo.note || todo.repeat || todo.priority === 'high' || todo.priority === 'urgent') && (
+        {(dayHint || todo.time || todo.reminder || todo.googleCalendarSync || planned || todo.note || todo.repeat || todo.estimatedMin || todo.priority === 'high' || todo.priority === 'urgent') && (
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-ink-muted">
             {planned && (
               <span className="inline-flex items-center gap-1 font-medium text-violet-300">
@@ -51,6 +51,12 @@ export function TodoRow({ todo, today, onOpen }: { todo: Todo; today: DateKey; o
               <span className="inline-flex items-center gap-1 tabular">
                 <Clock size={11} />
                 {todo.time}
+              </span>
+            )}
+            {!!todo.estimatedMin && !planned && (
+              <span className="inline-flex items-center gap-1 tabular">
+                <Timer size={11} />
+                {formatDuration(todo.estimatedMin)}
               </span>
             )}
             {todo.repeat && (

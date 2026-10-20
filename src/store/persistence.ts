@@ -17,6 +17,7 @@ export const DATA_KEYS = [
   'homework',
   'exams',
   'todos',
+  'grades',
 ] as const;
 
 export function pickData(state: AppState): AppData {
@@ -34,6 +35,7 @@ export function pickData(state: AppState): AppData {
     homework: state.homework,
     exams: state.exams,
     todos: state.todos,
+    grades: state.grades,
   };
 }
 
@@ -52,6 +54,7 @@ export function emptyData(): AppData {
     homework: [],
     exams: [],
     todos: [],
+    grades: [],
   };
 }
 
@@ -121,6 +124,7 @@ export function normalizeData(raw: Partial<AppData> | undefined): AppData {
     homework: arr<Homework>(raw.homework).map((h) => ({ ...h, plannedBlocks: Array.isArray(h.plannedBlocks) ? h.plannedBlocks : [] })),
     exams: arr<Exam>(raw.exams).map((e) => ({ ...e, studySessions: Array.isArray(e.studySessions) ? e.studySessions : [] })),
     todos: arr<Todo>(raw.todos),
+    grades: arr(raw.grades),
   };
 }
 
@@ -137,6 +141,8 @@ const OLD_DEFAULT_MIN_BLOCK = 15;
  *          Schul-Arbeitsblock (15 min) wird auf den neuen Standard gehoben – keine Mini-Lernblöcke mehr.
  * V4 → V5: To-dos können sich wiederholen. Wiederholungen ohne festen Tag (aus Fremd-Importen)
  *          werden entfernt – eine Wiederholung braucht immer einen Tag.
+ * V5 → V6: Noten (eigene Sammlung `grades`), gelernte Hausaufgabenzeit (`actualMinutes`), Schnelleingabe-
+ *          Erkennung. Alles kommt über Standardwerte in normalizeData dazu – keine Umwandlung nötig.
  */
 export function migrate(persisted: unknown, version: number): Partial<AppData> {
   const data = (persisted ?? {}) as Partial<AppData>;

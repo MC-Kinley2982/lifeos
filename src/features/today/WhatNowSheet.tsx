@@ -12,6 +12,7 @@ import { Button } from '../../ui/Button';
 import { cn } from '../../ui/cn';
 import { Sheet } from '../../ui/Sheet';
 import { toast } from '../../ui/toast';
+import { toggleHomeworkWithTime } from '../school/HomeworkTimePrompt';
 import { ENERGY_COLORS } from '../shared/energy';
 
 const MODE_ICON = { tasks: Sparkles, free: Gamepad2, rest: Coffee, night: Moon, short: Hourglass } as const;
@@ -23,7 +24,7 @@ export function WhatNowSheet({ onClose }: { onClose: () => void }) {
   const minuteKey = Math.floor(now.getTime() / 60_000);
   const s = useMemo(() => getPlanner().suggestNow(data, now), [data, minuteKey]);
   const startsLater = s.fromMinute > minutesSinceMidnight(now) + 1;
-  const { setTaskSchedule, updateTask, toggleTaskDone, applyPlan, setEnergy, addSchoolBlock, updateHomework, toggleHomeworkDone } = useAppStore.getState();
+  const { setTaskSchedule, updateTask, toggleTaskDone, applyPlan, setEnergy, addSchoolBlock, updateHomework } = useAppStore.getState();
   const manualEnergy = data.dailyStates[today]?.energy;
   const ModeIcon = MODE_ICON[s.mode];
 
@@ -116,7 +117,7 @@ export function WhatNowSheet({ onClose }: { onClose: () => void }) {
                         </Button>
                       )}
                       {item.homework && (
-                        <Button size="sm" variant="ghost" icon={Check} onClick={() => { toggleHomeworkDone(item.homework!.id); toast('Hausaufgabe erledigt – stark!'); }}>
+                        <Button size="sm" variant="ghost" icon={Check} onClick={() => { toggleHomeworkWithTime(item.homework!.id); toast('Hausaufgabe erledigt – stark!'); }}>
                           Erledigt
                         </Button>
                       )}

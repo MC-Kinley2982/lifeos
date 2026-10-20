@@ -1,6 +1,6 @@
 import type { Weekday } from '../../../domain/types';
 import { useAppStore } from '../../../store/useAppStore';
-import { Segmented } from '../../../ui/controls';
+import { Segmented, Toggle } from '../../../ui/controls';
 import { TextInput } from '../../../ui/fields';
 import { SettingRow, SettingsGroup } from '../SettingsLayout';
 
@@ -27,6 +27,12 @@ export function ProfileSection() {
             ]}
           />
         </SettingRow>
+        <Toggle
+          checked={ui.smartQuickAdd}
+          onChange={(v) => updateUi({ smartQuickAdd: v })}
+          label="Schnelleingabe versteht Angaben im Text"
+          description="„morgen 17 Uhr 45 min Mathe lernen“ → Tag, Uhrzeit und Dauer werden erkannt (auch „jeden Montag“, „bis Freitag“, „wichtig“). Erkanntes lässt sich vor dem Speichern antippen und abwählen."
+        />
       </SettingsGroup>
     </div>
   );

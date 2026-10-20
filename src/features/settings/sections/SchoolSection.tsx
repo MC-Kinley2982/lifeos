@@ -1,9 +1,12 @@
+import { Plus, Trash } from 'lucide-react';
+import { createId } from '../../../domain/ids';
 import { PRIORITY_LABEL } from '../../../domain/labels';
 import type { Priority } from '../../../domain/types';
 import { replanSchool } from '../../../store/schoolAutomation';
 import { useAppStore } from '../../../store/useAppStore';
+import { Button, IconButton } from '../../../ui/Button';
 import { Segmented, Toggle } from '../../../ui/controls';
-import { NumberInput, Select } from '../../../ui/fields';
+import { NumberInput, Select, TextInput } from '../../../ui/fields';
 import { SettingRow, SettingsGroup } from '../SettingsLayout';
 
 export function SchoolSection() {
@@ -11,6 +14,7 @@ export function SchoolSection() {
   const routines = useAppStore((s) => s.routines);
   const categories = useAppStore((s) => s.settings.categories);
   const updateSchoolSettings = useAppStore((s) => s.updateSchoolSettings);
+  const grades = useAppStore((s) => s.grades);
 
   return (
     <div className="space-y-4">
@@ -76,6 +80,29 @@ export function SchoolSection() {
         </SettingRow>
       </SettingsGroup>
 
+      <SettingsGroup
+        title="Hausaufgabenzeit lernen"
+        description="Trägst du nach dem Erledigen ein, wie lange du gebraucht hast, wird der Durchschnitt pro Fach zum Standard für neue Hausaufgaben. Der Wert im Fach (bzw. oben) gilt nur, bis genug Werte da sind."
+      >
+        <Toggle checked={school.learnHomeworkTime} onChange={(v) => updateSchoolSettings({ learnHomeworkTime: v })} label="Zeit pro Fach lernen" />
+        <Toggle
+          checked={school.askActualHomeworkTime}
+          onChange={(v) => updateSchoolSettings({ askActualHomeworkTime: v })}
+          label="Nach dem Erledigen fragen"
+          description="„Wie lange hat's gedauert?“ – überspringen ist jederzeit möglich."
+        />
+        {school.learnHomeworkTime && (
+          <>
+            <SettingRow label="Durchschnitt aus den letzten" description="Hausaufgaben des Fachs (gleitender Durchschnitt).">
+              <NumberInput value={school.homeworkLearnSamples} min={1} max={50} suffix="Stück" onChange={(v) => updateSchoolSettings({ homeworkLearnSamples: Math.max(1, Math.min(50, v)) })} />
+            </SettingRow>
+            <SettingRow label="Gelernten Wert nutzen ab" description="So viele eingetragene Zeiten braucht es mindestens.">
+              <NumberInput value={school.homeworkLearnMinSamples} min={1} max={20} suffix="Werten" onChange={(v) => updateSchoolSettings({ homeworkLearnMinSamples: Math.max(1, Math.min(20, v)) })} />
+            </SettingRow>
+          </>
+        )}
+      </SettingsGroup>
+
       <SettingsGroup title="Automatische Planung" description="Hausaufgaben und Lernzeit werden vor ihrer Deadline in freie Zeit gelegt. Manuell verschobene Blöcke bleiben, wo du sie hingelegt hast.">
         <Toggle checked={school.autoPlan} onChange={(v) => updateSchoolSettings({ autoPlan: v })} label="Automatisch einplanen" />
         <Toggle
@@ -122,6 +149,81 @@ export function SchoolSection() {
         <SettingRow label="Höchstens pro Tag und Test">
           <NumberInput value={school.maxStudyMinPerDay} min={15} step={15} suffix="min" onChange={(v) => updateSchoolSettings({ maxStudyMinPerDay: Math.max(15, v) })} />
         </SettingRow>
+      </SettingsGroup>
+
+      <SettingsGroup
+        title="Noten"
+        description="Wie dein Schnitt berechnet wird. Schulen rechnen unterschiedlich – stell es so ein, wie es bei dir gilt."
+        action={
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={Plus}
+            onClick={() => updateSchoolSettings({ gradeTypes: [...school.gradeTypes, { id: createId('gt'), name: 'Neue Art', weight: 1 }] })}
+          >
+            Art
+          </Button>
+        }
+      >
+        <SettingRow
+          label="Berechnung"
+          description={
+            school.gradeAverageMode === 'weighted'
+              ? 'Jede Note zählt mit dem Gewicht ihrer Art (z. B. Klassenarbeit doppelt).'
+              : 'Erst Schnitt je Art, dann die Arten nach Anteil (z. B. schriftlich 50 / mündlich 50).'
+          }
+        >
+          <Segmented<'weighted' | 'byType'>
+            size="sm"
+            value={school.gradeAverageMode}
+            onChange={(v) => updateSchoolSettings({ gradeAverageMode: v })}
+            options={[
+              { value: 'weighted', label: 'Gewichtet' },
+              { value: 'byType', label: 'Nach Art' },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow label="Plus/Minus" description="So viel ist ein „+“ bzw. „−“ wert (2- = 2 + Wert).">
+          <Select value={String(school.gradeTendencyStep)} onChange={(e) => updateSchoolSettings({ gradeTendencyStep: Number(e.target.value) })}>
+            {[0.25, 0.3, 0.33, 0.5].map((v) => (
+              <option key={v} value={v}>
+                {String(v).replace('.', ',')}
+              </option>
+            ))}
+            <option value={0}>Ohne Plus/Minus</option>
+          </Select>
+        </SettingRow>
+        <div className="mt-2 space-y-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_110px_40px] gap-2 px-1 text-[11px] font-medium text-ink-faint">
+            <span>Notenart</span>
+            <span>{school.gradeAverageMode === 'weighted' ? 'Gewicht' : 'Anteil'}</span>
+          </div>
+          {school.gradeTypes.map((t) => (
+            <div key={t.id} className="grid grid-cols-[minmax(0,1fr)_110px_40px] items-center gap-2">
+              <TextInput
+                value={t.name}
+                aria-label="Name der Notenart"
+                onChange={(e) => updateSchoolSettings({ gradeTypes: school.gradeTypes.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)) })}
+              />
+              <NumberInput
+                value={t.weight}
+                min={0}
+                step={school.gradeAverageMode === 'weighted' ? 0.5 : 5}
+                inputMode="decimal"
+                aria-label="Gewicht"
+                onChange={(v) => updateSchoolSettings({ gradeTypes: school.gradeTypes.map((x) => (x.id === t.id ? { ...x, weight: Math.max(0, v) } : x)) })}
+              />
+              <IconButton
+                icon={Trash}
+                label="Notenart entfernen"
+                size="sm"
+                disabled={school.gradeTypes.length <= 1 || grades.some((g) => g.typeId === t.id)}
+                title={grades.some((g) => g.typeId === t.id) ? 'Wird von Noten verwendet' : 'Notenart entfernen'}
+                onClick={() => updateSchoolSettings({ gradeTypes: school.gradeTypes.filter((x) => x.id !== t.id) })}
+              />
+            </div>
+          ))}
+        </div>
       </SettingsGroup>
 
       <button

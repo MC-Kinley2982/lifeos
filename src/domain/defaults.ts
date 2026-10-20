@@ -16,6 +16,7 @@ import type {
   EnergySettings,
   Exam,
   Goal,
+  GradeType,
   IntegrationSettings,
   Meal,
   PlanningSettings,
@@ -233,7 +234,24 @@ export function defaultSchoolSettings(): SchoolSettings {
     defaultStudyLeadDays: 5,
     defaultStudySessionMin: 45,
     maxStudyMinPerDay: 60,
+    learnHomeworkTime: true,
+    askActualHomeworkTime: true,
+    homeworkLearnSamples: 5,
+    homeworkLearnMinSamples: 2,
+    gradeTypes: defaultGradeTypes(),
+    gradeAverageMode: 'weighted',
+    gradeTendencyStep: 0.3,
   };
+}
+
+/** Übliche Notenarten – Namen und Gewichte sind in den Schul-Einstellungen frei änderbar. */
+export function defaultGradeTypes(): GradeType[] {
+  return [
+    { id: 'gt_exam', name: 'Klassenarbeit', weight: 2 },
+    { id: 'gt_test', name: 'Test', weight: 1 },
+    { id: 'gt_oral', name: 'Mündlich', weight: 1 },
+    { id: 'gt_other', name: 'Sonstige', weight: 1 },
+  ];
 }
 
 /** Vorschläge für Fächer (Name, Kurzform, Farbe) – werden nur auf Wunsch angelegt. */
@@ -271,7 +289,7 @@ export function createDefaultSettings(name = ''): Settings {
     categories: defaultCategories(),
     planning: defaultPlanningSettings(),
     school: defaultSchoolSettings(),
-    ui: { weekStartsOn: 0, hideCompletedTodos: false },
+    ui: { weekStartsOn: 0, hideCompletedTodos: false, smartQuickAdd: true },
     integrations: defaultIntegrationSettings(),
   };
 }

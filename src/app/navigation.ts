@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarClock, Ellipsis, GraduationCap, ListChecks, ListTodo, Repeat, Settings, Sun, Target, type LucideIcon } from 'lucide-react';
+import { CalendarDays, CalendarClock, ChartColumn, Ellipsis, GraduationCap, ListChecks, ListTodo, Repeat, Settings, Sun, Target, type LucideIcon } from 'lucide-react';
 import { PATHS, type RouteName } from './router';
 
 export interface NavItem {
@@ -19,13 +19,14 @@ export const NAV_ITEMS: NavItem[] = [
   { route: 'goals', label: 'Ziele', path: PATHS.goals, icon: Target },
   { route: 'events', label: 'Termine', path: PATHS.events, icon: CalendarClock },
   { route: 'routines', label: 'Routinen', path: PATHS.routines, icon: Repeat },
+  { route: 'review', label: 'Rückblick', path: PATHS.review(), icon: ChartColumn },
   { route: 'settings', label: 'Mein Alltag', path: PATHS.settings(), icon: Settings },
 ];
 
 const byRoute = (r: RouteName) => NAV_ITEMS.find((i) => i.route === r)!;
 
 /** Bereiche, die mobil unter "Mehr" liegen. */
-export const MORE_ROUTES: RouteName[] = ['tasks', 'goals', 'events', 'routines', 'settings'];
+export const MORE_ROUTES: RouteName[] = ['tasks', 'goals', 'events', 'routines', 'review', 'settings'];
 
 /**
  * Mobile Bottom-Navigation: die im Alltag meistgenutzten Bereiche + "Mehr".

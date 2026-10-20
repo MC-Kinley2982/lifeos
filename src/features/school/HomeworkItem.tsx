@@ -3,27 +3,21 @@ import { formatDuration } from '../../domain/time';
 import type { Homework } from '../../domain/types';
 import { homeworkRemainingMinutes, isBlockUpcoming, isHomeworkOverdue } from '../../services/school/homework';
 import { subjectLabel } from '../../services/school/timetable';
-import { replanSchool } from '../../store/schoolAutomation';
-import { useAppStore } from '../../store/useAppStore';
 import { cn } from '../../ui/cn';
 import { Badge } from '../../ui/controls';
 import { TaskCheckbox } from '../tasks/TaskItem';
 import { formatBlock, formatDeadline } from './format';
+import { toggleHomeworkWithTime } from './HomeworkTimePrompt';
 import { useSubject } from './SchoolBits';
 
 export function HomeworkItem({ homework, today, now, onOpen }: { homework: Homework; today: string; now: Date; onOpen: (h: Homework) => void }) {
-  const toggleHomeworkDone = useAppStore((s) => s.toggleHomeworkDone);
   const label = subjectLabel(useSubject(homework.subjectId));
   const done = homework.status === 'done';
   const overdue = isHomeworkOverdue(homework, now);
   const upcoming = homework.plannedBlocks.filter((b) => !b.done && isBlockUpcoming(b, now));
   const missing = homeworkRemainingMinutes(homework, now);
 
-  const toggle = () => {
-    const reopening = done;
-    toggleHomeworkDone(homework.id);
-    if (reopening) replanSchool({ homeworkIds: [homework.id] });
-  };
+  const toggle = () => toggleHomeworkWithTime(homework.id);
 
   return (
     <div

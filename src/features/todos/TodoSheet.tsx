@@ -64,7 +64,7 @@ export function TodoSheet({ todoId, onClose }: { todoId: string; onClose: () => 
   const google = useAppStore((s) => s.settings.integrations.googleCalendar);
   const { updateTodo, removeTodo } = useAppStore.getState();
   const [title, setTitle] = useState(todo?.title ?? '');
-  const [minutes, setMinutes] = useState(task?.estimatedMin ?? 30);
+  const [minutes, setMinutes] = useState(task?.estimatedMin ?? todo?.estimatedMin ?? 30);
   const [customReminder, setCustomReminder] = useState(false);
   const [outcome, setOutcome] = useState<TodoPlanOutcome | null>(null);
 

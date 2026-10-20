@@ -1,7 +1,7 @@
 import { stamp } from '../../domain/factories';
 import { createId, nowIso } from '../../domain/ids';
 import { minutesSinceMidnight, toDateKey, toMinutes } from '../../domain/time';
-import type { Exam, Homework, SchoolBlock, Subject, TimetableEntry } from '../../domain/types';
+import type { Exam, Grade, Homework, SchoolBlock, Subject, TimetableEntry } from '../../domain/types';
 import { patchEntity, removeById } from '../helpers';
 import type { AppState, BlockOwner, SchoolActions, SliceCreator } from '../types';
 
@@ -10,6 +10,7 @@ export interface SchoolSlice extends SchoolActions {
   timetable: TimetableEntry[];
   homework: Homework[];
   exams: Exam[];
+  grades: Grade[];
 }
 
 /** Blöcke einer Hausaufgabe bzw. Lerneinheiten eines Tests unveränderlich bearbeiten. */
@@ -33,6 +34,7 @@ export const createSchoolSlice: SliceCreator<SchoolSlice> = (set) => ({
   timetable: [],
   homework: [],
   exams: [],
+  grades: [],
 
   updateSchoolSettings: (patch) => set((s) => ({ settings: { ...s.settings, school: { ...s.settings.school, ...patch } } })),
 
@@ -105,6 +107,19 @@ export const createSchoolSlice: SliceCreator<SchoolSlice> = (set) => ({
   removeSchoolBlock: (owner, blockId) => set((s) => mapBlocks(s, owner, (blocks) => blocks.filter((b) => b.id !== blockId))),
   toggleSchoolBlockDone: (owner, blockId) =>
     set((s) => mapBlocks(s, owner, (blocks) => blocks.map((b) => (b.id === blockId ? { ...b, done: !b.done } : b)))),
+
+  setHomeworkActualMinutes: (id, minutes) =>
+    set((s) => ({
+      homework: patchEntity(s.homework, id, { actualMinutes: minutes !== undefined && minutes > 0 ? Math.round(minutes) : undefined }),
+    })),
+
+  addGrade: (input) => {
+    const grade = stamp(input, 'grade');
+    set((s) => ({ grades: [...s.grades, grade] }));
+    return grade.id;
+  },
+  updateGrade: (id, patch) => set((s) => ({ grades: patchEntity(s.grades, id, patch) })),
+  removeGrade: (id) => set((s) => ({ grades: removeById(s.grades, id) })),
 
   applySchoolPlan: (result) =>
     set((s) => {

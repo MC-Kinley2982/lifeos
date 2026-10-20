@@ -14,6 +14,7 @@ import { DateInput, Field, NumberInput, TimeInput } from '../../ui/fields';
 import { Sheet } from '../../ui/Sheet';
 import { toast } from '../../ui/toast';
 import { formatDeadline } from './format';
+import { toggleHomeworkWithTime } from './HomeworkTimePrompt';
 
 /**
  * Einen Hausaufgaben- oder Lernblock verschieben (z. B. aus der Timeline).
@@ -21,7 +22,7 @@ import { formatDeadline } from './format';
  */
 export function BlockEditSheet({ owner, blockId, onClose }: { owner: BlockOwner; blockId: ID; onClose: () => void }) {
   const data = usePlannerData();
-  const { updateSchoolBlock, removeSchoolBlock, toggleHomeworkDone } = useAppStore.getState();
+  const { updateSchoolBlock, removeSchoolBlock } = useAppStore.getState();
   const hw = owner.kind === 'homework' ? data.homework.find((h) => h.id === owner.id) : undefined;
   const exam = owner.kind === 'exam' ? data.exams.find((e) => e.id === owner.id) : undefined;
   const block = (hw?.plannedBlocks ?? exam?.studySessions ?? []).find((b) => b.id === blockId);
@@ -104,9 +105,9 @@ export function BlockEditSheet({ owner, blockId, onClose }: { owner: BlockOwner;
             variant="secondary"
             size="sm"
             onClick={() => {
-              toggleHomeworkDone(hw.id);
-              toast('Hausaufgabe erledigt');
               onClose();
+              toggleHomeworkWithTime(hw.id);
+              toast('Hausaufgabe erledigt');
             }}
           >
             Ganze Hausaufgabe als erledigt markieren

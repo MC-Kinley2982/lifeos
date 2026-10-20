@@ -5,7 +5,7 @@ import { PRIORITY_LABEL } from '../../domain/labels';
 import { nowIso } from '../../domain/ids';
 import { todayKey } from '../../domain/time';
 import type { Homework, Priority, TaskEnergy, TaskStatus } from '../../domain/types';
-import { computeHomeworkDeadline, createHomeworkInput, defaultHomeworkMinutes } from '../../services/school/homework';
+import { computeHomeworkDeadline, createHomeworkInput, defaultHomeworkMinutes, learnedHomeworkMinutes } from '../../services/school/homework';
 import { subjectLabel } from '../../services/school/timetable';
 import { usePlannerData } from '../../store/hooks';
 import { replanSchool } from '../../store/schoolAutomation';
@@ -17,6 +17,7 @@ import { DateInput, Field, NumberInput, TextArea, TextInput, TimeInput } from '.
 import { Sheet } from '../../ui/Sheet';
 import { toast } from '../../ui/toast';
 import { formatDeadline, planSummary } from './format';
+import { askHomeworkTime } from './HomeworkTimePrompt';
 import { BlockRows, SubjectSelect, useSubject } from './SchoolBits';
 
 const DURATIONS = [15, 30, 45, 60, 90];
@@ -49,6 +50,10 @@ export function HomeworkForm({ homework, defaults, onClose }: HomeworkFormProps)
   const color = subjectLabel(subject).color;
 
   const autoDeadline = (subjectId: string, assignedDate: string) => computeHomeworkDeadline(data, subjectId, assignedDate);
+  const learned = learnedHomeworkMinutes(data, draft.subjectId);
+  const durationHint = `Standard: ${defaultHomeworkMinutes(data, draft.subjectId)} min${
+    learned ? ` (gelernt aus ${learned.samples} Hausaufgaben in ${subject?.name ?? 'diesem Fach'})` : subject?.homeworkMinutes ? ` (Ø für ${subject.name})` : ''
+  }`;
 
   const changeSubject = (subjectId: string) =>
     setDraft((d) => ({
@@ -76,6 +81,8 @@ export function HomeworkForm({ homework, defaults, onClose }: HomeworkFormProps)
       });
       if (replanNeeded) toast(planSummary(replanSchool({ homeworkIds: [homework.id] })));
       else toast('Hausaufgabe gespeichert');
+      // Gerade erledigt und noch keine Dauer eingetragen → kurz nachfragen (daraus lernt LifeOS die Zeit pro Fach).
+      if (homework.status !== 'done' && draft.status === 'done' && !draft.actualMinutes) askHomeworkTime(homework.id);
     } else {
       const id = addHomework({ ...draft, title: draft.title.trim() });
       toast(planSummary(replanSchool({ homeworkIds: [id] })));
@@ -113,7 +120,7 @@ export function HomeworkForm({ homework, defaults, onClose }: HomeworkFormProps)
           <TextInput autoFocus={!homework} value={draft.title} onChange={(e) => set('title', e.target.value)} placeholder="z. B. S. 43 Nr. 3–7" />
         </Field>
 
-        <Field label="Geschätzte Dauer" hint={`Standard: ${defaultHomeworkMinutes(data, draft.subjectId)} min${subject?.homeworkMinutes ? ` (Ø für ${subject.name})` : ''}`}>
+        <Field label="Geschätzte Dauer" hint={durationHint}>
           <div className="flex flex-wrap items-center gap-1.5">
             {DURATIONS.map((m) => (
               <button
@@ -182,6 +189,18 @@ export function HomeworkForm({ homework, defaults, onClose }: HomeworkFormProps)
                 ]}
               />
             </Field>
+            {draft.status === 'done' && (
+              <Field label="Tatsächlich gebraucht (optional)" hint="Daraus lernt LifeOS die Hausaufgabenzeit pro Fach.">
+                <NumberInput
+                  className="w-40"
+                  value={draft.actualMinutes ?? 0}
+                  min={0}
+                  step={5}
+                  suffix="min"
+                  onChange={(v) => set('actualMinutes', v > 0 ? v : undefined)}
+                />
+              </Field>
+            )}
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-ink-muted">Eingeplante Zeit</span>

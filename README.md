@@ -47,6 +47,21 @@ npm run preview    # Produktions-Build lokal ansehen
     oder monatlich, jeweils „alle n …“. Nach dem Abhaken erscheint automatisch das nächste Vorkommen; Wieder-Öffnen
     nimmt es zurück. Verpasstes stapelt sich nicht, sondern rückt auf das letzte fällige Vorkommen.
   - **Siri / Kurzbefehle:** `#/todos?add=Text&when=today` legt ein To-do an (siehe unten).
+- **Schnelleingabe mit Texterkennung** (To-dos, Aufgaben, Siri-Link): „morgen 17 Uhr 45 min Mathe lernen“,
+  „freitag Geschenk kaufen“, „jeden Montag Sporttasche packen“, „Referat bis Freitag 2 Stunden wichtig“.
+  Erkannt werden Tag (heute/morgen/übermorgen, Wochentage, 24.10., 24. Oktober, in 3 Tagen, diese/nächste Woche,
+  Wochenende, später), Uhrzeit (17 Uhr, 17:30, um 5 → 17:00, halb 5), Dauer, Wiederholung, Tageszeit und
+  Wichtigkeit. Regelbasiert, ohne KI-Dienst; die Vorschau zeigt, was erkannt wurde – antippen = ignorieren.
+  Abschaltbar unter *Mein Alltag → Profil & Allgemein*.
+- **Hausaufgabenzeit lernen:** Nach dem Erledigen fragt LifeOS (abschaltbar), wie lange es gedauert hat. Der
+  gleitende Durchschnitt der letzten Hausaufgaben eines Fachs wird zum Standard für neue Hausaufgaben
+  (Anzahl und Mindestmenge einstellbar; bis dahin gilt der Startwert des Fachs bzw. der allgemeine Standard).
+- **Noten** (*Schule → Noten*): deutsche Skala 1–6 mit Plus/Minus (Wert einstellbar), Notenarten mit Gewicht
+  (Klassenarbeit, Test, Mündlich … frei änderbar), Berechnung „gewichtet“ oder „nach Notenart“ (z. B. schriftlich
+  50 % / mündlich 50 %), Schnitt pro Fach und gesamt, „Was brauche ich in der nächsten Arbeit?“ und eine Liste
+  vergangener Tests ohne Note. Synchronisiert als Sammlung `grades`.
+- **Rückblick** (Wochenstatistik): Erledigtes (Aufgaben, To-dos, Hausaufgaben), geschaffte Zeit, freie Zeit,
+  Zielfortschritt, Zeit pro Tag (fest · geplant · frei, auch als Tabelle) und die letzten 8 Wochen im Vergleich.
 - **Google Kalender (optional):** Google-Termine lesen (blockieren Zeit) und – nur auf Wunsch – Termine,
   Hausaufgaben, Lernzeiten, markierte To-dos oder Routinen eintragen (für die normalen Google-Benachrichtigungen).
 
@@ -61,7 +76,7 @@ https://mc-kinley2982.github.io/lifeos/#/todos?add=Sporttasche%20packen&when=tom
 | Parameter | Bedeutung |
 | --- | --- |
 | `add` | Titel (Pflicht, URL-codiert). Mehrere Zeilen = mehrere To-dos. |
-| `when` | `today` · `tomorrow` · `week` · `later` oder `YYYY-MM-DD` (Standard: heute) |
+| `when` | `today` · `tomorrow` · `week` · `later` oder `YYYY-MM-DD`. Ohne Angabe erkennt LifeOS „morgen“, „Freitag 17 Uhr“ … im Text, sonst heute. |
 | `time` | optionale Uhrzeit `HH:MM` |
 | `note` | optionale Notiz |
 | `important` | `1` = als wichtig markieren |
@@ -209,8 +224,10 @@ src/
       schedule.ts      Tagesplan inkl. Stundenplan-Schulzeit, Tests, Hausaufgaben-/Lernblöcke
       placement.ts     gemeinsame Bausteine: Budgets (Freizeit-Schutz), Fokus-Regel, Slot-Bewertung
       autoPlan.ts      Aufgaben/Ziele vorschlagen · suggest.ts „Was soll ich jetzt machen?“
-    school/            Stundenplan, Hausaufgaben (Deadline, Dauer), Tests (Lernzeitraum, Fortschritt),
-                       schoolPlanner.ts (Hausaufgaben + Lernzeit gemeinsam planen), prompt.ts
+    school/            Stundenplan, Hausaufgaben (Deadline, Dauer, gelernte Zeit), Tests (Lernzeitraum, Fortschritt),
+                       schoolPlanner.ts (Hausaufgaben + Lernzeit gemeinsam planen), prompt.ts, grades.ts (Noten)
+    nlp/               Texterkennung der Schnelleingabe (quickAdd.ts, regelbasiert, Deutsch)
+    stats/             Wochenrückblick (weekly.ts)
     cloud/             CloudBackend-Interface, Supabase-Adapter, In-Memory-Server (Tests/Dev-Mock)
     sync/              Sync-Engine (Outbox, Pull/Push, Konflikte, erster Login), Datensatz-Abbildung
     calendar/ focus/ ai/   Platzhalter für Google Calendar, Focus Co-Pilot, KI-Planer
@@ -237,5 +254,5 @@ dev/                   Vite-Plugin für die simulierte Cloud (nur Entwicklung)
 ### Bewusst noch nicht umgesetzt
 
 Google Calendar, Focus Co-Pilot, KI-Planung, Push-Benachrichtigungen, Echtzeit-Sync (Supabase Realtime),
-feldgenaues Zusammenführen bei Konflikten (aktuell: neuere Änderung pro Eintrag gewinnt), automatisch gelernte
-Hausaufgabenzeiten pro Fach (Datenfeld vorbereitet), A/B-Wochen im Stundenplan, Noten, Passwort-zurücksetzen-Seite.
+feldgenaues Zusammenführen bei Konflikten (aktuell: neuere Änderung pro Eintrag gewinnt), A/B-Wochen im Stundenplan,
+Oberstufen-Punkte (0–15) bei den Noten, Passwort-zurücksetzen-Seite.

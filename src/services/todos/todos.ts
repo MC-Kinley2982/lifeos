@@ -1,5 +1,7 @@
+import type { TodoInput } from '../../domain/factories';
 import { addDays, relativeDayLabel, startOfWeek, toDateKey } from '../../domain/time';
 import type { DateKey, Todo, TodoHorizon, Weekday } from '../../domain/types';
+import type { QuickParse } from '../nlp/quickAdd';
 
 /**
  * Reine Logik der To-do-Liste (ohne React/Store): Abschnitte, Sortierung, "wann"-Auswahl.
@@ -125,4 +127,26 @@ export function todoPlanDates(todo: Pick<Todo, 'horizon' | 'date'>, today: DateK
 export function todoPlanDeadline(todo: Pick<Todo, 'horizon' | 'date'>, today: DateKey, weekStartsOn: Weekday): DateKey | undefined {
   const dates = todoPlanDates(todo, today, weekStartsOn);
   return todo.horizon === 'later' ? undefined : dates[dates.length - 1];
+}
+
+/**
+ * Ergebnis der Texterkennung auf ein neues To-do anwenden ("morgen 17 Uhr 45 min Mathe lernen").
+ * Erkanntes hat Vorrang vor der Auswahl "Wann?"; ohne Erkennung bleibt `base` unverändert.
+ */
+export function applyQuickParse(base: TodoInput, parse: QuickParse | null): TodoInput {
+  if (!parse || parse.chips.length === 0) return base;
+  const out: TodoInput = { ...base, title: parse.title };
+  if (parse.horizon === 'day' && parse.date) {
+    out.horizon = 'day';
+    out.date = parse.date;
+  } else if (parse.horizon === 'week' && parse.date) {
+    Object.assign(out, { horizon: 'week', date: parse.date, time: undefined });
+  } else if (parse.horizon === 'later') {
+    Object.assign(out, { horizon: 'later', date: undefined, time: undefined });
+  }
+  if (parse.time && out.horizon === 'day') out.time = parse.time;
+  if (parse.durationMin) out.estimatedMin = parse.durationMin;
+  if (parse.priority) out.priority = parse.priority;
+  if (parse.repeat && out.horizon === 'day') out.repeat = parse.repeat;
+  return out;
 }

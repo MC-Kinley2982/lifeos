@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react';
 import { SUBJECT_SUGGESTIONS } from '../../domain/defaults';
 import { subjectDraft, type SubjectInput } from '../../domain/factories';
 import type { Subject } from '../../domain/types';
+import { learnedHomeworkMinutes } from '../../services/school/homework';
+import { usePlannerData } from '../../store/hooks';
 import { useAppStore } from '../../store/useAppStore';
 import { Button } from '../../ui/Button';
 import { Card, EmptyState } from '../../ui/Card';
@@ -16,6 +18,7 @@ export function SubjectsManager() {
   const timetable = useAppStore((s) => s.timetable);
   const defaultMin = useAppStore((s) => s.settings.school.defaultHomeworkMinutes);
   const addSubject = useAppStore((s) => s.addSubject);
+  const data = usePlannerData();
   const [editing, setEditing] = useState<Subject | 'new' | null>(null);
 
   const suggestions = SUBJECT_SUGGESTIONS.filter((s) => !subjects.some((x) => x.name.toLowerCase() === s.name.toLowerCase()));
@@ -29,6 +32,7 @@ export function SubjectsManager() {
           <div className="divide-y divide-white/[0.04]">
             {subjects.map((s) => {
               const lessons = timetable.filter((e) => e.subjectId === s.id).length;
+              const learned = learnedHomeworkMinutes(data, s.id);
               return (
                 <button key={s.id} type="button" onClick={() => setEditing(s)} className="flex w-full items-center gap-3 py-3 text-left hover:bg-white/[0.02]">
                   <ColorDot color={s.color} className="h-3 w-3" />
@@ -37,7 +41,7 @@ export function SubjectsManager() {
                       {s.name} {s.shortName && <span className="text-ink-faint">· {s.shortName}</span>}
                     </span>
                     <span className="block text-xs text-ink-muted">
-                      {lessons} Std./Woche · Ø Hausaufgabe {s.homeworkMinutes ?? defaultMin} min
+                      {lessons} Std./Woche · Ø Hausaufgabe {learned ? `${learned.minutes} min (gelernt)` : `${s.homeworkMinutes ?? defaultMin} min`}
                       {s.teacher ? ` · ${s.teacher}` : ''}
                     </span>
                   </span>
@@ -81,6 +85,8 @@ export function SubjectsManager() {
 function SubjectForm({ subject, onClose }: { subject?: Subject; onClose: () => void }) {
   const { addSubject, updateSubject, removeSubject } = useAppStore.getState();
   const defaultMin = useAppStore((s) => s.settings.school.defaultHomeworkMinutes);
+  const data = usePlannerData();
+  const learned = subject ? learnedHomeworkMinutes(data, subject.id) : null;
   const [draft, setDraft] = useState<SubjectInput>(() => (subject ? { ...subject } : subjectDraft()));
   const set = <K extends keyof SubjectInput>(key: K, value: SubjectInput[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
@@ -136,7 +142,14 @@ function SubjectForm({ subject, onClose }: { subject?: Subject; onClose: () => v
             <TextInput value={draft.room ?? ''} onChange={(e) => set('room', e.target.value || undefined)} />
           </Field>
         </div>
-        <Field label="Ø Hausaufgabenzeit (optional)" hint={`Leer = allgemeiner Standard (${defaultMin} min).`}>
+        <Field
+          label={data.settings.school.learnHomeworkTime ? 'Startwert Ø Hausaufgabenzeit (optional)' : 'Ø Hausaufgabenzeit (optional)'}
+          hint={
+            learned
+              ? `Gelernt: Ø ${learned.minutes} min aus ${learned.samples} erledigten Hausaufgaben – dieser Wert gilt gerade als Standard.`
+              : `Leer = allgemeiner Standard (${defaultMin} min).${data.settings.school.learnHomeworkTime ? ' Sobald du Zeiten einträgst, lernt LifeOS den echten Durchschnitt.' : ''}`
+          }
+        >
           <NumberInput value={draft.homeworkMinutes ?? 0} min={0} step={5} suffix="min" onChange={(v) => set('homeworkMinutes', v > 0 ? v : undefined)} />
         </Field>
         {subject && <p className="text-[11px] text-ink-faint">Beim Löschen werden auch die Stunden dieses Fachs aus dem Stundenplan entfernt. Hausaufgaben und Tests bleiben erhalten.</p>}

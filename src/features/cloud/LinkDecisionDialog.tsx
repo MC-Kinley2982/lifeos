@@ -15,6 +15,7 @@ function SummaryList({ s }: { s: DataSummary }) {
     ['Fächer', s.subjects],
     ['Hausaufgaben', s.homework],
     ['Tests', s.exams],
+    ['Noten', s.grades],
   ];
   return (
     <ul className="mt-2 space-y-0.5 text-xs text-ink-muted">

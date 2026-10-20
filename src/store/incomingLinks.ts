@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { parseHash, PATHS, replacePath } from '../app/router';
 import { toDateKey } from '../domain/time';
+import { parseQuickAdd } from '../services/nlp/quickAdd';
 import { LINK_PARAM, parseTodoLink } from '../services/todos/links';
+import { applyQuickParse } from '../services/todos/todos';
 import { toast } from '../ui/toast';
 import { useAppStore } from './useAppStore';
 
@@ -17,11 +19,15 @@ export function handleIncomingLink(now = new Date()): number {
   // Zuerst die Adresse bereinigen – so kann derselbe Link nie zweimal verarbeitet werden.
   replacePath(PATHS.todos);
   const state = useAppStore.getState();
-  const link = parseTodoLink(route.query, toDateKey(now), state.settings.ui.weekStartsOn);
+  const today = toDateKey(now);
+  const { weekStartsOn, smartQuickAdd } = state.settings.ui;
+  const link = parseTodoLink(route.query, today, weekStartsOn);
   if (!link) return 0;
-  for (const input of link.todos) state.addTodo(input);
+  // Ohne ausdrückliches "when" darf die Texterkennung den Tag bestimmen ("Hey Siri … morgen Sporttasche packen").
+  const parse = (title: string) => (smartQuickAdd && !link.explicitWhen ? parseQuickAdd(title, { today, weekStartsOn, ignore: ['timeOfDay'] }) : null);
+  for (const input of link.todos) state.addTodo(applyQuickParse(input, parse(input.title)));
   const n = link.todos.length;
-  toast(n === 1 ? `To-do hinzugefügt: ${link.todos[0].title}` : `${n} To-dos hinzugefügt`);
+  toast(n === 1 ? `To-do hinzugefügt: ${useAppStore.getState().todos.at(-1)?.title ?? link.todos[0].title}` : `${n} To-dos hinzugefügt`);
   return n;
 }
 

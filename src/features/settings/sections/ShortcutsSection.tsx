@@ -14,7 +14,7 @@ function appUrl(): string {
 
 const PARAMS: Array<{ name: string; text: string }> = [
   { name: 'add', text: 'Titel des To-dos (Pflicht). Mehrere Zeilen ergeben mehrere To-dos.' },
-  { name: 'when', text: 'today · tomorrow · week · later oder ein Datum (2026-10-24). Ohne Angabe: heute.' },
+  { name: 'when', text: 'today · tomorrow · week · later oder ein Datum (2026-10-24). Ohne Angabe erkennt LifeOS Angaben wie „morgen“ oder „Freitag 17 Uhr“ im Text, sonst heute.' },
   { name: 'time', text: 'Uhrzeit, z. B. 07:30 (optional)' },
   { name: 'note', text: 'Notiz (optional)' },
   { name: 'important', text: '1 = als wichtig markieren (optional)' },
