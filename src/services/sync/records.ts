@@ -20,6 +20,8 @@ export const LIST_COLLECTIONS = [
   'exams',
   'todos',
   'grades',
+  'vocabDecks',
+  'vocabCards',
 ] as const;
 
 type ListCollection = (typeof LIST_COLLECTIONS)[number];
@@ -108,6 +110,7 @@ export interface DataSummary {
   events: number;
   todos: number;
   grades: number;
+  vocabCards: number;
 }
 
 export function summarize(data: AppData): DataSummary {
@@ -121,5 +124,6 @@ export function summarize(data: AppData): DataSummary {
     events: data.events.length,
     todos: data.todos.length,
     grades: data.grades.length,
+    vocabCards: data.vocabCards.length,
   };
 }

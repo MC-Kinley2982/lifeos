@@ -11,12 +11,13 @@ import { createSchoolSlice } from './slices/schoolSlice';
 import { createSettingsSlice } from './slices/settingsSlice';
 import { createTasksSlice } from './slices/tasksSlice';
 import { createTodosSlice } from './slices/todosSlice';
+import { createVocabSlice } from './slices/vocabSlice';
 import type { AppData, AppState } from './types';
 
 /**
  * Zentraler App-Store.
  * Bereiche: settings · routines · events · tasks · todos · goals · dailyStates (+ vacations, specialDays)
- * · Schule (subjects, timetable, homework, exams).
+ * · Schule (subjects, timetable, homework, exams, grades) · Vokabeln (vocabDecks, vocabCards).
  * Persistiert in localStorage; nur Daten werden gespeichert, keine Funktionen.
  * Die Cloud-Synchronisierung (services/sync) liest und ersetzt Daten über diesen Store.
  */
@@ -31,6 +32,7 @@ export const useAppStore = create<AppState>()(
       ...createGoalsSlice(...a),
       ...createDailySlice(...a),
       ...createSchoolSlice(...a),
+      ...createVocabSlice(...a),
       ...createDataSlice(...a),
     }),
     {

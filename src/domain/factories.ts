@@ -17,6 +17,8 @@ import type {
   TimetableEntry,
   Todo,
   Vacation,
+  VocabCard,
+  VocabDeck,
   Weekday,
 } from './types';
 
@@ -34,8 +36,15 @@ export type TimetableEntryInput = Omit<TimetableEntry, 'id' | 'createdAt' | 'upd
 export type HomeworkInput = Omit<Homework, 'id' | 'createdAt' | 'updatedAt'>;
 export type ExamInput = Omit<Exam, 'id' | 'createdAt' | 'updatedAt'>;
 export type GradeInput = Omit<Grade, 'id' | 'createdAt' | 'updatedAt'>;
+export type VocabDeckInput = Omit<VocabDeck, 'id' | 'createdAt' | 'updatedAt'>;
+/** Neue Karte: nur Vorder-/Rückseite (+ Notiz) – der Lernstand beginnt in Box 1. */
+export type VocabCardInput = Pick<VocabCard, 'deckId' | 'front' | 'back' | 'note'>;
 /** Neues To-do: Titel und "wann" reichen, alles andere ist optional. */
 export type TodoInput = Omit<Todo, 'id' | 'createdAt' | 'updatedAt' | 'order' | 'completed' | 'completedAt'>;
+
+export function vocabDeckDraft(subject?: Pick<Subject, 'id' | 'name'>): VocabDeckInput {
+  return { name: subject ? `${subject.name} – Vokabeln` : '', subjectId: subject?.id, frontLabel: 'Deutsch', backLabel: subject?.name ?? 'Fremdsprache', direction: 'forward', newPerDay: 10 };
+}
 
 export function subjectDraft(): SubjectInput {
   return { name: '', shortName: '', color: '#60a5fa' };

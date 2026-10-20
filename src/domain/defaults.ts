@@ -28,6 +28,7 @@ import type {
   Task,
   TimeHHMM,
   TimetableEntry,
+  VocabSettings,
   Weekday,
 } from './types';
 
@@ -244,6 +245,11 @@ export function defaultSchoolSettings(): SchoolSettings {
   };
 }
 
+/** Lernkartei: 5 Boxen (täglich, alle 3 Tage, wöchentlich, alle 2 Wochen, monatlich). */
+export function defaultVocabSettings(): VocabSettings {
+  return { intervals: [1, 3, 7, 14, 30], wrongTo: 'first', sessionLimit: 0 };
+}
+
 /** Übliche Notenarten – Namen und Gewichte sind in den Schul-Einstellungen frei änderbar. */
 export function defaultGradeTypes(): GradeType[] {
   return [
@@ -289,6 +295,7 @@ export function createDefaultSettings(name = ''): Settings {
     categories: defaultCategories(),
     planning: defaultPlanningSettings(),
     school: defaultSchoolSettings(),
+    vocab: defaultVocabSettings(),
     ui: { weekStartsOn: 0, hideCompletedTodos: false, smartQuickAdd: true },
     integrations: defaultIntegrationSettings(),
   };

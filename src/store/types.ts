@@ -35,6 +35,9 @@ import type {
   UiSettings,
   UserProfile,
   Vacation,
+  VocabCard,
+  VocabDeck,
+  VocabSettings,
   Weekday,
   WorkWindow,
 } from '../domain/types';
@@ -49,6 +52,8 @@ import type {
   TaskInput,
   TimetableEntryInput,
   TodoInput,
+  VocabCardInput,
+  VocabDeckInput,
 } from '../domain/factories';
 import type { PlanItem } from '../services/planner/types';
 import type { SchoolPlanResult } from '../services/school/types';
@@ -70,6 +75,8 @@ export interface AppData {
   exams: Exam[];
   todos: Todo[];
   grades: Grade[];
+  vocabDecks: VocabDeck[];
+  vocabCards: VocabCard[];
 }
 
 export type BlockOwner = { kind: 'homework'; id: ID } | { kind: 'exam'; id: ID };
@@ -202,6 +209,22 @@ export interface DailyActions {
   setFreeTarget(date: DateKey, minutes: number | null): void;
 }
 
+export interface VocabActions {
+  updateVocabSettings(patch: Partial<VocabSettings>): void;
+  addVocabDeck(input: VocabDeckInput): ID;
+  updateVocabDeck(id: ID, patch: Partial<VocabDeckInput>): void;
+  /** Löscht das Deck samt seiner Karten. */
+  removeVocabDeck(id: ID): void;
+  /** Mehrere Karten auf einmal anlegen (Import); gibt die neuen IDs zurück. */
+  addVocabCards(inputs: VocabCardInput[]): ID[];
+  updateVocabCard(id: ID, patch: Partial<VocabCardInput>): void;
+  removeVocabCard(id: ID): void;
+  /** Abfrage-Ergebnis (gewusst / nicht gewusst) – setzt Box und nächste Fälligkeit. */
+  reviewVocabCard(id: ID, correct: boolean, today: DateKey): void;
+  /** Lernstand einer Karte zurücksetzen (wieder neu). */
+  resetVocabCard(id: ID): void;
+}
+
 export interface DataActions {
   completeOnboarding(opts: { name: string; withExample: boolean; today: DateKey }): void;
   exportData(): string;
@@ -222,6 +245,7 @@ export type AppState = AppData &
   GoalActions &
   DailyActions &
   SchoolActions &
+  VocabActions &
   DataActions;
 
 export type SliceCreator<T> = StateCreator<AppState, [['zustand/persist', unknown]], [], T>;

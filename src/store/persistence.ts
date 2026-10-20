@@ -18,6 +18,8 @@ export const DATA_KEYS = [
   'exams',
   'todos',
   'grades',
+  'vocabDecks',
+  'vocabCards',
 ] as const;
 
 export function pickData(state: AppState): AppData {
@@ -36,6 +38,8 @@ export function pickData(state: AppState): AppData {
     exams: state.exams,
     todos: state.todos,
     grades: state.grades,
+    vocabDecks: state.vocabDecks,
+    vocabCards: state.vocabCards,
   };
 }
 
@@ -55,6 +59,8 @@ export function emptyData(): AppData {
     exams: [],
     todos: [],
     grades: [],
+    vocabDecks: [],
+    vocabCards: [],
   };
 }
 
@@ -93,6 +99,7 @@ export function normalizeData(raw: Partial<AppData> | undefined): AppData {
       energyRequirement: { ...d.planning.energyRequirement, ...s.planning?.energyRequirement },
     },
     school: normalizeSchool(s.school, routines),
+    vocab: { ...d.vocab, ...s.vocab, intervals: Array.isArray(s.vocab?.intervals) && s.vocab.intervals.length ? s.vocab.intervals : d.vocab.intervals },
     ui: { ...d.ui, ...s.ui },
     integrations: {
       ...d.integrations,
@@ -125,6 +132,8 @@ export function normalizeData(raw: Partial<AppData> | undefined): AppData {
     exams: arr<Exam>(raw.exams).map((e) => ({ ...e, studySessions: Array.isArray(e.studySessions) ? e.studySessions : [] })),
     todos: arr<Todo>(raw.todos),
     grades: arr(raw.grades),
+    vocabDecks: arr(raw.vocabDecks),
+    vocabCards: arr(raw.vocabCards),
   };
 }
 
@@ -143,6 +152,8 @@ const OLD_DEFAULT_MIN_BLOCK = 15;
  *          werden entfernt – eine Wiederholung braucht immer einen Tag.
  * V5 → V6: Noten (eigene Sammlung `grades`), gelernte Hausaufgabenzeit (`actualMinutes`), Schnelleingabe-
  *          Erkennung. Alles kommt über Standardwerte in normalizeData dazu – keine Umwandlung nötig.
+ * V6 → V7: Vokabeln (Sammlungen `vocabDecks` und `vocabCards`, Einstellungen `settings.vocab`) –
+ *          ebenfalls nur neue Standardwerte.
  */
 export function migrate(persisted: unknown, version: number): Partial<AppData> {
   const data = (persisted ?? {}) as Partial<AppData>;

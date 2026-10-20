@@ -18,6 +18,7 @@ import { HomeworkForm } from '../school/HomeworkForm';
 import { SchoolTodayCard } from '../school/SchoolTodayCard';
 import { TaskForm } from '../tasks/TaskForm';
 import { TodayTodosCard } from '../todos/TodayTodosCard';
+import { VocabTodayCard } from '../vocab/VocabTodayCard';
 import { DayHeader } from './DayHeader';
 import { DayStateSheet } from './DayStateSheet';
 import { EnergySheet } from './EnergySheet';
@@ -125,8 +126,10 @@ export function TodayPage({ dateParam }: { dateParam?: string }) {
             onOpenBlock={(owner, blockId) => setSchool({ kind: 'block', owner, blockId })}
           />
         </div>
-        <div className="order-1 lg:order-none">
+        <div className="order-1 space-y-5 lg:order-none">
           <TodayTodosCard date={date} today={today} />
+          {/* Im selben Rasterfeld wie die To-dos – so bleibt die Desktop-Aufteilung gleich. */}
+          {isToday && <VocabTodayCard today={today} />}
         </div>
         <div className="order-1 lg:order-none">
           <TodayTasks date={date} today={today} onOpenTask={setEditing} />

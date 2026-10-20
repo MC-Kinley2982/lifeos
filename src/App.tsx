@@ -11,6 +11,7 @@ import { useGoogleCalendarSync } from './store/googleCalendar';
 import { useIncomingLinks } from './store/incomingLinks';
 import { usePlanMaintenance } from './store/schoolAutomation';
 import { useAppStore } from './store/useAppStore';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 import { Toaster } from './ui/toast';
 
 /**
@@ -31,6 +32,7 @@ const TasksPage = lazyPage(() => import('./features/tasks/TasksPage'), 'TasksPag
 const GoalsPage = lazyPage(() => import('./features/goals/GoalsPage'), 'GoalsPage');
 const EventsPage = lazyPage(() => import('./features/events/EventsPage'), 'EventsPage');
 const RoutinesPage = lazyPage(() => import('./features/routines/RoutinesPage'), 'RoutinesPage');
+const VocabPage = lazyPage(() => import('./features/vocab/VocabPage'), 'VocabPage');
 const ReviewPage = lazyPage(() => import('./features/review/ReviewPage'), 'ReviewPage');
 const SettingsPage = lazyPage(() => import('./features/settings/SettingsPage'), 'SettingsPage');
 const MorePage = lazyPage(() => import('./features/more/MorePage'), 'MorePage');
@@ -77,6 +79,8 @@ function Page({ route }: { route: Route }) {
       return <EventsPage />;
     case 'routines':
       return <RoutinesPage />;
+    case 'vocab':
+      return <VocabPage params={route.params} />;
     case 'review':
       return <ReviewPage weekParam={route.params[0]} />;
     case 'settings':
@@ -105,14 +109,18 @@ export function App() {
     <>
       {onboardingDone ? (
         <AppShell route={route.name}>
-          <Suspense fallback={<PageFallback />}>
-            <Page route={route} />
-          </Suspense>
+          <ErrorBoundary resetKey={route.name}>
+            <Suspense fallback={<PageFallback />}>
+              <Page route={route} />
+            </Suspense>
+          </ErrorBoundary>
         </AppShell>
       ) : (
-        <Suspense fallback={<PageFallback />}>
-          <Welcome />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<PageFallback />}>
+            <Welcome />
+          </Suspense>
+        </ErrorBoundary>
       )}
       <AfterSchoolPrompt enabled={onboardingDone && cloudReady && !linkPending} />
       <HomeworkTimePrompt />

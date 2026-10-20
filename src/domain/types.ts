@@ -297,6 +297,19 @@ export interface GradeType {
   weight: number;
 }
 
+/** Lernkartei (Leitner-System) für Vokabeln. */
+export interface VocabSettings {
+  /**
+   * Wiederholungsabstand je Box in Tagen – die Länge bestimmt die Anzahl der Boxen.
+   * Standard [1, 3, 7, 14, 30]: Box 1 täglich … Box 5 monatlich.
+   */
+  intervals: number[];
+  /** Falsch beantwortet: zurück in Box 1 (klassisch) oder nur eine Box zurück. */
+  wrongTo: 'first' | 'previous';
+  /** Höchstens so viele Karten pro Lerneinheit (0 = alle fälligen). */
+  sessionLimit: number;
+}
+
 export interface Settings {
   profile: UserProfile;
   onboardingDone: boolean;
@@ -308,6 +321,7 @@ export interface Settings {
   categories: Category[];
   planning: PlanningSettings;
   school: SchoolSettings;
+  vocab: VocabSettings;
   ui: UiSettings;
   integrations: IntegrationSettings;
 }
@@ -599,6 +613,49 @@ export interface Exam {
   sessionMinutes?: number;
   preferredTimeOfDay?: TimeOfDay;
   studySessions: StudySession[];
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Vokabeln: Decks und Karten (Leitner-System)
+// ─────────────────────────────────────────────────────────────
+
+/** In welche Richtung abgefragt wird: Vorderseite zeigen (→ Rückseite nennen), umgekehrt oder gemischt. */
+export type VocabDirection = 'forward' | 'backward' | 'mixed';
+
+export interface VocabDeck {
+  id: ID;
+  name: string;
+  /** Optional einem Schulfach zugeordnet (Farbe, Anzeige). */
+  subjectId?: ID;
+  /** Beschriftung der Seiten, z. B. "Deutsch" und "Russisch". */
+  frontLabel: string;
+  backLabel: string;
+  direction: VocabDirection;
+  /** So viele neue Karten kommen pro Tag dazu (0 = unbegrenzt). */
+  newPerDay: number;
+  /** Optional: eigene Farbe, wenn kein Fach zugeordnet ist. */
+  color?: string;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+}
+
+export interface VocabCard {
+  id: ID;
+  deckId: ID;
+  front: string;
+  back: string;
+  note?: string;
+  /** Leitner-Box 1…n (Anzahl = Länge von VocabSettings.intervals). */
+  box: number;
+  /** Ab diesem Tag fällig. Ohne = neue Karte, noch nie gelernt. */
+  due?: DateKey;
+  /** Tag der ersten Abfrage (für das Tageslimit neuer Karten). */
+  introducedOn?: DateKey;
+  lastReviewed?: DateKey;
+  correct: number;
+  wrong: number;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
 }

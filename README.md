@@ -60,6 +60,12 @@ npm run preview    # Produktions-Build lokal ansehen
   (Klassenarbeit, Test, Mündlich … frei änderbar), Berechnung „gewichtet“ oder „nach Notenart“ (z. B. schriftlich
   50 % / mündlich 50 %), Schnitt pro Fach und gesamt, „Was brauche ich in der nächsten Arbeit?“ und eine Liste
   vergangener Tests ohne Note. Synchronisiert als Sammlung `grades`.
+- **Vokabeln** (Lernkartei nach dem Leitner-System): Decks pro Fach oder Lektion, Karten einzeln oder als Liste
+  einfügen („Haus ; дом“, auch aus Excel kopiert), jeden Tag nur die fälligen Karten plus eine einstellbare Zahl
+  neuer Karten. Gewusst → nächste Box (Standard: täglich · alle 3 Tage · wöchentlich · alle 2 Wochen · monatlich),
+  nicht gewusst → zurück in Box 1 und am Ende der Einheit noch einmal. Abfrage in beide Richtungen oder gemischt,
+  Aufdecken oder Antwort tippen (tolerant bei Groß-/Kleinschreibung, Satzzeichen, Betonungszeichen und ё/е).
+  „Heute“ zeigt fällige Vokabeln mit Direktstart. Synchronisiert als Sammlungen `vocabDecks` und `vocabCards`.
 - **Rückblick** (Wochenstatistik): Erledigtes (Aufgaben, To-dos, Hausaufgaben), geschaffte Zeit, freie Zeit,
   Zielfortschritt, Zeit pro Tag (fest · geplant · frei, auch als Tabelle) und die letzten 8 Wochen im Vergleich.
 - **Google Kalender (optional):** Google-Termine lesen (blockieren Zeit) und – nur auf Wunsch – Termine,
@@ -228,6 +234,7 @@ src/
                        schoolPlanner.ts (Hausaufgaben + Lernzeit gemeinsam planen), prompt.ts, grades.ts (Noten)
     nlp/               Texterkennung der Schnelleingabe (quickAdd.ts, regelbasiert, Deutsch)
     stats/             Wochenrückblick (weekly.ts)
+    vocab/             Lernkartei: Leitner-Boxen, fällige Karten, Antwortprüfung, Listen-Import (leitner.ts)
     cloud/             CloudBackend-Interface, Supabase-Adapter, In-Memory-Server (Tests/Dev-Mock)
     sync/              Sync-Engine (Outbox, Pull/Push, Konflikte, erster Login), Datensatz-Abbildung
     calendar/ focus/ ai/   Platzhalter für Google Calendar, Focus Co-Pilot, KI-Planer

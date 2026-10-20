@@ -16,6 +16,7 @@ function SummaryList({ s }: { s: DataSummary }) {
     ['Hausaufgaben', s.homework],
     ['Tests', s.exams],
     ['Noten', s.grades],
+    ['Vokabeln', s.vocabCards],
   ];
   return (
     <ul className="mt-2 space-y-0.5 text-xs text-ink-muted">
