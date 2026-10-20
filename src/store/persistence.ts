@@ -135,6 +135,8 @@ const OLD_DEFAULT_MIN_BLOCK = 15;
  * V3 → V4: To-dos, geschützte Zeiträume (Morgenroutine) und Integrationen kommen über die
  *          Standardwerte in normalizeData dazu. Der unveränderte alte Standard für den kleinsten
  *          Schul-Arbeitsblock (15 min) wird auf den neuen Standard gehoben – keine Mini-Lernblöcke mehr.
+ * V4 → V5: To-dos können sich wiederholen. Wiederholungen ohne festen Tag (aus Fremd-Importen)
+ *          werden entfernt – eine Wiederholung braucht immer einen Tag.
  */
 export function migrate(persisted: unknown, version: number): Partial<AppData> {
   const data = (persisted ?? {}) as Partial<AppData>;
@@ -153,6 +155,9 @@ export function migrate(persisted: unknown, version: number): Partial<AppData> {
   }
   if (version < 4 && data.settings?.school?.minBlockMin === OLD_DEFAULT_MIN_BLOCK) {
     data.settings = { ...data.settings, school: { ...data.settings.school, minBlockMin: defaultSchoolSettings().minBlockMin } };
+  }
+  if (version < 5 && Array.isArray(data.todos)) {
+    data.todos = data.todos.map((t) => (t.repeat && (t.horizon !== 'day' || !t.date) ? { ...t, repeat: undefined } : t));
   }
   return data;
 }

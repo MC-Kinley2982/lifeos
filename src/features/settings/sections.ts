@@ -1,4 +1,4 @@
-import { BatteryMedium, Cloud, Coffee, Database, GraduationCap, Moon, Sparkles, Tags, Thermometer, TreePalm, UserRound, Utensils, type LucideIcon } from 'lucide-react';
+import { BatteryMedium, Cloud, Coffee, Database, GraduationCap, Mic, Moon, Sparkles, Tags, Thermometer, TreePalm, UserRound, Utensils, type LucideIcon } from 'lucide-react';
 
 export interface SettingsSectionMeta {
   id: string;
@@ -10,6 +10,7 @@ export interface SettingsSectionMeta {
 export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   { id: 'profil', label: 'Profil & Allgemein', description: 'Name, Wochenstart', icon: UserRound },
   { id: 'konto', label: 'Konto & Integrationen', description: 'Geräte synchronisieren, Google Kalender', icon: Cloud },
+  { id: 'kurzbefehle', label: 'Kurzbefehle & Siri', description: 'To-dos per Sprachbefehl oder Link anlegen', icon: Mic },
   { id: 'schule', label: 'Schule', description: 'Schulzeit, Hausaufgaben, Lernzeit', icon: GraduationCap },
   { id: 'schlaf', label: 'Schlaf', description: 'Aufstehen & Schlafenszeit, pro Wochentag', icon: Moon },
   { id: 'mahlzeiten', label: 'Mahlzeiten', description: 'Frühstück, Mittag, Abendessen …', icon: Utensils },

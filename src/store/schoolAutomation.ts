@@ -82,8 +82,9 @@ export function clearFreeTarget(date: DateKey): void {
 
 /**
  * Hält den Plan aktuell: beim Start, beim Zurückkehren in die App und alle 10 Minuten
- * 1. überlastete Tage entlasten (Mindest-Freizeit, Planungsanteil, keine Doppelungen),
- * 2. verpasste Schulblöcke entfernen und offene Restzeit neu einplanen.
+ * 1. verpasste wiederkehrende To-dos auf ihr letztes fälliges Vorkommen setzen,
+ * 2. überlastete Tage entlasten (Mindest-Freizeit, Planungsanteil, keine Doppelungen),
+ * 3. verpasste Schulblöcke entfernen und offene Restzeit neu einplanen.
  * `ready` erlaubt es, damit zu warten (z. B. bis die Cloud-Daten geladen sind).
  */
 export function usePlanMaintenance(ready: boolean): void {
@@ -92,6 +93,7 @@ export function usePlanMaintenance(ready: boolean): void {
     const run = () => {
       const s = useAppStore.getState();
       if (!s.settings.onboardingDone) return;
+      s.rollRepeatingTodos(toDateKey(new Date()));
       const moved = rebalanceNow().moved;
       if (moved.length) toast(`Plan angepasst: ${moved.length} ${moved.length === 1 ? 'Eintrag' : 'Einträge'} verschoben, damit genug Freizeit bleibt`, 'info');
       if (s.settings.school.enabled) replanSchool();

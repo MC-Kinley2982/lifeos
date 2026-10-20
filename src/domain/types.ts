@@ -386,6 +386,17 @@ export interface TodoReminder {
 }
 
 /**
+ * Wiederholung eines To-dos (z. B. "Sporttasche packen" jeden Montag).
+ * Nach dem Abhaken erscheint automatisch das nächste Vorkommen als neues To-do.
+ * `every` = alle n Tage/Wochen/Monate, gezählt ab `anchor` (Datum, an dem die Wiederholung beginnt).
+ */
+export type TodoRepeat =
+  | { type: 'daily'; every: number; anchor: DateKey }
+  | { type: 'weekly'; every: number; anchor: DateKey; weekdays: Weekday[] }
+  /** day = Tag im Monat (1–31; in kürzeren Monaten der letzte Tag). */
+  | { type: 'monthly'; every: number; anchor: DateKey; day: number };
+
+/**
  * Ein To-do ist nur "Das möchte ich erledigen" – es blockiert keine Zeit und wird nie
  * automatisch geplant. Erst "Planen" verknüpft es mit einer Aufgabe, für die LifeOS Zeit sucht.
  */
@@ -409,6 +420,10 @@ export interface Todo {
   googleCalendarEventId?: string;
   /** Verknüpfte Aufgabe nach "Planen" – ohne bleibt es ein reines To-do. */
   taskId?: ID;
+  /** Optionale Wiederholung – braucht einen festen Tag. */
+  repeat?: TodoRepeat;
+  /** Beim Abhaken angelegtes nächstes Vorkommen (wird beim Wieder-Öffnen zurückgenommen, solange unverändert). */
+  repeatNextId?: ID;
   /** Sortierung innerhalb der Liste. */
   order: number;
   createdAt: ISODateTime;

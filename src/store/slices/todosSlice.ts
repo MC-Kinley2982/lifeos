@@ -1,6 +1,7 @@
 import { stamp } from '../../domain/factories';
 import { nowIso } from '../../domain/ids';
 import type { Todo } from '../../domain/types';
+import { rollRepeatingTodos, setTodoCompleted } from '../../services/todos/repeat';
 import { patchEntity, removeById } from '../helpers';
 import type { SliceCreator, TodoActions } from '../types';
 
@@ -36,10 +37,12 @@ export const createTodosSlice: SliceCreator<TodosSlice> = (set) => ({
       const todo = state.todos.find((t) => t.id === id);
       if (!todo) return {};
       const completed = !todo.completed;
-      const ts = nowIso();
+      const now = new Date();
+      const ts = now.toISOString();
       const completedAt = completed ? ts : undefined;
       return {
-        todos: state.todos.map((t) => (t.id === id ? { ...t, completed, completedAt, updatedAt: ts } : t)),
+        // Wiederkehrend: das nächste Vorkommen entsteht beim Abhaken (und verschwindet beim Wieder-Öffnen).
+        todos: setTodoCompleted(state.todos, id, completed, now),
         // Geplantes To-do: die verknüpfte Aufgabe wird mit erledigt (bzw. wieder geöffnet).
         ...(todo.taskId
           ? { tasks: state.tasks.map((t) => (t.id === todo.taskId ? { ...t, status: completed ? 'done' : 'todo', completedAt, updatedAt: ts } : t)) }
@@ -52,6 +55,12 @@ export const createTodosSlice: SliceCreator<TodosSlice> = (set) => ({
       todos: removeById(state.todos, id),
       tasks: state.tasks.filter((t) => t.todoId !== id),
     })),
+
+  rollRepeatingTodos: (today) =>
+    set((state) => {
+      const rolled = rollRepeatingTodos(state.todos, today, nowIso());
+      return rolled ? { todos: rolled } : {};
+    }),
 
   setTodoCalendarEventIds: (ids) =>
     set((state) => {

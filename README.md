@@ -43,8 +43,45 @@ npm run preview    # Produktions-Build lokal ansehen
   gespeichert. Ein To-do blockiert keine Zeit; erst „Planen“ macht daraus eine Aufgabe, für die LifeOS einen freien
   Zeitraum sucht (Reihenfolge: Termine → geschützte Zeiten/Routinen → Schule → Hausaufgaben → Aufgaben →
   geplante To-dos → Ziele → freie Zeit). Synchronisiert über dieselbe `lifeos_records`-Tabelle (Sammlung `todos`).
+  - **Wiederkehrende To-dos** (z. B. „Sporttasche packen“ jeden Montag): täglich, wöchentlich an bestimmten Tagen
+    oder monatlich, jeweils „alle n …“. Nach dem Abhaken erscheint automatisch das nächste Vorkommen; Wieder-Öffnen
+    nimmt es zurück. Verpasstes stapelt sich nicht, sondern rückt auf das letzte fällige Vorkommen.
+  - **Siri / Kurzbefehle:** `#/todos?add=Text&when=today` legt ein To-do an (siehe unten).
 - **Google Kalender (optional):** Google-Termine lesen (blockieren Zeit) und – nur auf Wunsch – Termine,
   Hausaufgaben, Lernzeiten, markierte To-dos oder Routinen eintragen (für die normalen Google-Benachrichtigungen).
+
+## Kurzbefehle & Siri: „To-do hinzufügen“
+
+Ein Link legt To-dos an – ideal für einen iOS-Kurzbefehl, ein Lesezeichen oder andere Apps:
+
+```
+https://mc-kinley2982.github.io/lifeos/#/todos?add=Sporttasche%20packen&when=tomorrow
+```
+
+| Parameter | Bedeutung |
+| --- | --- |
+| `add` | Titel (Pflicht, URL-codiert). Mehrere Zeilen = mehrere To-dos. |
+| `when` | `today` · `tomorrow` · `week` · `later` oder `YYYY-MM-DD` (Standard: heute) |
+| `time` | optionale Uhrzeit `HH:MM` |
+| `note` | optionale Notiz |
+| `important` | `1` = als wichtig markieren |
+
+Der Link wird genau einmal verarbeitet: Die Parameter verschwinden danach aus der Adresszeile, Neuladen oder
+„Zurück“ legt nichts doppelt an. Kommt der Link vor dem Onboarding bzw. vor dem ersten Cloud-Abgleich an, wartet
+LifeOS damit, bis die Daten bereit sind.
+
+**iOS-Kurzbefehl einrichten** (auch in der App unter *Mein Alltag → Kurzbefehle & Siri*, mit Link-Vorlage zum Kopieren):
+
+1. App **Kurzbefehle** → **+**.
+2. Aktion **„Nach Eingabe fragen“** (Text), Frage z. B. „Was soll auf die Liste?“.
+3. Aktion **„URL codieren“** (engl. „URL Encode“) mit *Bereitgestellte Eingabe*.
+4. Aktion **„URL“**: `https://mc-kinley2982.github.io/lifeos/#/todos?add=` + Variable *URL-codierter Text* + `&when=today`.
+5. Aktion **„URLs öffnen“**.
+6. Kurzbefehl **„To-do hinzufügen“** nennen → „Hey Siri, To-do hinzufügen“.
+
+> **Wichtig (iPhone):** „URLs öffnen“ öffnet **Safari**, nicht die Home-Bildschirm-App. iOS trennt die Speicher von
+> Safari und Home-Bildschirm-Apps – ohne Konto landet das To-do also nur in Safari. Damit es in der App erscheint, in
+> **beiden** mit demselben Konto anmelden; die Cloud-Synchronisierung gleicht es dann ab.
 
 ## Cloud-Synchronisierung einrichten (Supabase)
 
@@ -177,10 +214,12 @@ src/
     cloud/             CloudBackend-Interface, Supabase-Adapter, In-Memory-Server (Tests/Dev-Mock)
     sync/              Sync-Engine (Outbox, Pull/Push, Konflikte, erster Login), Datensatz-Abbildung
     calendar/ focus/ ai/   Platzhalter für Google Calendar, Focus Co-Pilot, KI-Planer
-    storage/           Persistenz-Adapter (localStorage, Version 2 mit Migration)
+    todos/             To-do-Liste: Abschnitte, Wiederholungen (repeat.ts), Kurzbefehl-Links (links.ts)
+    storage/           Persistenz-Adapter (localStorage, versioniert; Migrationen in store/persistence.ts)
   store/               useAppStore (Slices: settings, routines, events, tasks, goals, daily, school, data),
                        cloud.ts (Sync-Anbindung), schoolAutomation.ts (automatisches Neuplanen)
   features/            UI pro Bereich: today, week, school, tasks, goals, events, routines, settings, cloud …
+                       (alles außer Heute/To-dos lädt per Code-Splitting erst bei Bedarf, im Hintergrund vorgeladen)
   ui/                  Design-System
 supabase/              SQL-Migration + RLS-Test
 dev/                   Vite-Plugin für die simulierte Cloud (nur Entwicklung)

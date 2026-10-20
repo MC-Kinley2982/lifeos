@@ -1,7 +1,7 @@
 import { stamp } from '../../domain/factories';
-import { nowIso } from '../../domain/ids';
 import { toHHMM } from '../../domain/time';
 import type { Task } from '../../domain/types';
+import { setTodoCompleted } from '../../services/todos/repeat';
 import { patchEntity, removeById } from '../helpers';
 import type { SliceCreator, TaskActions } from '../types';
 
@@ -38,14 +38,13 @@ export const createTasksSlice: SliceCreator<TasksSlice> = (set, get) => ({
       const task = state.tasks.find((t) => t.id === id);
       if (!task) return {};
       const done = task.status !== 'done';
-      const ts = nowIso();
+      const now = new Date();
+      const ts = now.toISOString();
       const completedAt = done ? ts : undefined;
       return {
         tasks: state.tasks.map((t) => (t.id === id ? { ...t, status: done ? 'done' : 'todo', completedAt, updatedAt: ts } : t)),
-        // Geplantes To-do: Aufgabe erledigt = To-do erledigt.
-        ...(task.todoId
-          ? { todos: state.todos.map((t) => (t.id === task.todoId ? { ...t, completed: done, completedAt, updatedAt: ts } : t)) }
-          : {}),
+        // Geplantes To-do: Aufgabe erledigt = To-do erledigt (bei Wiederholung inkl. nächstem Vorkommen).
+        ...(task.todoId ? { todos: setTodoCompleted(state.todos, task.todoId, done, now) } : {}),
       };
     }),
 

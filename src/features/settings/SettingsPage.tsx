@@ -13,6 +13,7 @@ import { PlanningSection } from './sections/PlanningSection';
 import { ProfileSection } from './sections/ProfileSection';
 import { AccountSection } from './sections/AccountSection';
 import { SchoolSection } from './sections/SchoolSection';
+import { ShortcutsSection } from './sections/ShortcutsSection';
 import { SleepSection } from './sections/SleepSection';
 import { VacationSection } from './sections/VacationSection';
 import { SETTINGS_SECTIONS } from './sections';
@@ -20,6 +21,7 @@ import { SETTINGS_SECTIONS } from './sections';
 const CONTENT: Record<string, ComponentType> = {
   profil: ProfileSection,
   konto: AccountSection,
+  kurzbefehle: ShortcutsSection,
   schule: SchoolSection,
   schlaf: SleepSection,
   mahlzeiten: MealsSection,

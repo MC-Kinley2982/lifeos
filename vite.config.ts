@@ -11,6 +11,16 @@ const base = process.env.GITHUB_PAGES === 'true' ? '/lifeos/' : '/';
 
 export default defineConfig({
   base,
+  build: {
+    rolldownOptions: {
+      output: {
+        // React ändert sich selten → eigene Datei, die bei App-Updates im Cache bleibt.
+        codeSplitting: {
+          groups: [{ name: 'react', test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/ }],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),

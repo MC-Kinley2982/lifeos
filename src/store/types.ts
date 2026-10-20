@@ -153,6 +153,8 @@ export interface TodoActions {
   toggleTodo(id: ID): void;
   /** Löscht das To-do samt der Aufgabe, die durch "Planen" entstanden ist. */
   removeTodo(id: ID): void;
+  /** Verpasste wiederkehrende To-dos auf ihr letztes fälliges Vorkommen setzen. */
+  rollRepeatingTodos(today: DateKey): void;
   /** Nach der Google-Synchronisierung: IDs der von LifeOS angelegten Termine merken. */
   setTodoCalendarEventIds(ids: Record<ID, string | undefined>): void;
 }

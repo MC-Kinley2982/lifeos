@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 
 /**
  * Minimaler Hash-Router (#/woche, #/tag/2026-10-03 …).
@@ -9,6 +9,8 @@ export type RouteName = 'today' | 'day' | 'todos' | 'week' | 'school' | 'tasks' 
 export interface Route {
   name: RouteName;
   params: string[];
+  /** Parameter nach dem "?" (z. B. #/todos?add=Milch&when=today für Kurzbefehle/Siri). */
+  query: URLSearchParams;
 }
 
 const SEGMENT_TO_ROUTE: Record<string, RouteName> = {
@@ -39,10 +41,13 @@ export const PATHS = {
   more: '/mehr',
 };
 
-function parse(hash: string): Route {
-  const path = hash.replace(/^#/, '').replace(/^\/+/, '');
+export function parseHash(hash: string): Route {
+  const raw = hash.replace(/^#/, '');
+  const q = raw.indexOf('?');
+  const path = (q >= 0 ? raw.slice(0, q) : raw).replace(/^\/+/, '');
+  const query = new URLSearchParams(q >= 0 ? raw.slice(q + 1) : '');
   const [first = '', ...params] = path.split('/').filter((p, i) => p !== '' || i === 0);
-  return { name: SEGMENT_TO_ROUTE[first] ?? 'today', params };
+  return { name: SEGMENT_TO_ROUTE[first] ?? 'today', params, query };
 }
 
 function subscribe(cb: () => void) {
@@ -54,7 +59,7 @@ const getHash = () => window.location.hash;
 
 export function useRoute(): Route {
   const hash = useSyncExternalStore(subscribe, getHash, () => '');
-  return parse(hash);
+  return useMemo(() => parseHash(hash), [hash]);
 }
 
 export function navigate(path: string): void {
@@ -63,6 +68,14 @@ export function navigate(path: string): void {
     window.location.hash = path;
     window.scrollTo({ top: 0 });
   }
+}
+
+/** Adresse ersetzen, ohne einen neuen Verlaufseintrag anzulegen (z. B. verarbeitete Link-Parameter entfernen). */
+export function replacePath(path: string): void {
+  const target = `#${path}`;
+  if (window.location.hash === target) return;
+  window.history.replaceState(window.history.state, '', target);
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
 }
 
 export function hrefFor(path: string): string {

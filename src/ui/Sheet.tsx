@@ -2,6 +2,10 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from './cn';
+import { isEditable } from './interaction';
+
+/** Offene Dialoge (oberster zuletzt) – ESC schließt nur den obersten. */
+const openStack: symbol[] = [];
 
 interface SheetProps {
   open: boolean;
@@ -15,7 +19,9 @@ interface SheetProps {
 
 /**
  * Dialog: auf dem Smartphone als Bottom-Sheet, auf dem Desktop zentriert.
- * Schließt per ESC, Klick auf den Hintergrund oder X.
+ * Schließt per ESC (nur der oberste Dialog), Klick auf den Hintergrund oder X.
+ * Danach kehrt der Fokus zum vorher fokussierten Element zurück (außer bei Eingabefeldern –
+ * sonst würde auf dem iPhone ungefragt die Tastatur aufgehen).
  */
 export function Sheet({ open, onClose, title, subtitle, children, footer, size = 'md' }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -24,14 +30,21 @@ export function Sheet({ open, onClose, title, subtitle, children, footer, size =
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCloseRef.current();
+    const token = Symbol('sheet');
+    openStack.push(token);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && openStack[openStack.length - 1] === token) onCloseRef.current();
+    };
     document.addEventListener('keydown', onKey);
     const prevOverflow = document.body.style.overflow;
+    const prevFocus = document.activeElement;
     document.body.style.overflow = 'hidden';
-    panelRef.current?.focus();
+    panelRef.current?.focus({ preventScroll: true });
     return () => {
+      openStack.splice(openStack.indexOf(token), 1);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
+      if (prevFocus instanceof HTMLElement && prevFocus.isConnected && !isEditable(prevFocus)) prevFocus.focus({ preventScroll: true });
     };
   }, [open]);
 

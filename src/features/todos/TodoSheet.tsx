@@ -1,15 +1,16 @@
 import { useState, type ReactNode } from 'react';
-import { Bell, CalendarCheck, Sparkles, X } from 'lucide-react';
+import { Bell, CalendarCheck, Repeat, Sparkles, X } from 'lucide-react';
 import { hrefFor, PATHS } from '../../app/router';
 import { formatDuration, relativeDayLabel, toDateKey, toHHMM, toMinutes } from '../../domain/time';
-import type { Todo } from '../../domain/types';
+import type { Todo, TodoRepeat } from '../../domain/types';
+import { defaultRepeat, firstOccurrenceFrom, nextOccurrence, occursOn, repeatLabel, type RepeatType } from '../../services/todos/repeat';
 import { fieldsToWhen, whenToFields, type TodoWhen } from '../../services/todos/todos';
 import { useNow } from '../../store/hooks';
 import { planTodo, TODO_PLAN_MINUTES, unplanTodo, type TodoPlanOutcome } from '../../store/todoPlanning';
 import { useAppStore } from '../../store/useAppStore';
 import { Button } from '../../ui/Button';
 import { cn } from '../../ui/cn';
-import { DeleteButton, Segmented, Toggle } from '../../ui/controls';
+import { DeleteButton, Segmented, Toggle, WeekdayPicker } from '../../ui/controls';
 import { DateInput, Field, NumberInput, TextArea, TimeInput } from '../../ui/fields';
 import { Sheet } from '../../ui/Sheet';
 
@@ -20,6 +21,15 @@ const WHEN_OPTIONS: Array<{ value: TodoWhen; label: string }> = [
   { value: 'later', label: 'Später' },
   { value: 'date', label: 'Datum' },
 ];
+
+const REPEAT_OPTIONS: Array<{ value: RepeatType | 'none'; label: string }> = [
+  { value: 'none', label: 'Nie' },
+  { value: 'daily', label: 'Täglich' },
+  { value: 'weekly', label: 'Wöchentlich' },
+  { value: 'monthly', label: 'Monatlich' },
+];
+
+const REPEAT_UNIT: Record<RepeatType, string> = { daily: 'Tage', weekly: 'Wochen', monthly: 'Monate' };
 
 const REMINDER_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 0, label: 'Zur Uhrzeit' },
@@ -76,6 +86,16 @@ export function TodoSheet({ todoId, onClose }: { todoId: string; onClose: () => 
     setOutcome(planTodo(todo.id, m));
   };
 
+  /** Wiederholung setzen: Der Tag des To-dos rückt bei Bedarf auf das erste passende Vorkommen ab heute. */
+  const applyRepeat = (rule: TodoRepeat | undefined) => {
+    if (!rule) return patch({ repeat: undefined });
+    const keep = hasDay && occursOn(rule, todo.date!) ? todo.date! : undefined;
+    const date = keep ?? firstOccurrenceFrom(rule, today) ?? today;
+    patch({ repeat: { ...rule, anchor: date } as TodoRepeat, horizon: 'day', date });
+  };
+  const repeatType: RepeatType | 'none' = todo.repeat?.type ?? 'none';
+  const afterNext = todo.repeat && hasDay ? nextOccurrence(todo.repeat, todo.date! > today ? todo.date! : today) : undefined;
+
   return (
     <Sheet
       open
@@ -121,7 +141,11 @@ export function TodoSheet({ todoId, onClose }: { todoId: string; onClose: () => 
               <Chip
                 key={o.value}
                 active={when === o.value}
-                onClick={() => patch(whenToFields(o.value, today, weekStartsOn, o.value === 'date' ? (todo.date ?? today) : undefined))}
+                onClick={() => {
+                  const fields = whenToFields(o.value, today, weekStartsOn, o.value === 'date' ? (todo.date ?? today) : undefined);
+                  // Eine Wiederholung braucht einen festen Tag.
+                  patch({ ...fields, ...(fields.horizon !== 'day' ? { repeat: undefined } : {}) });
+                }}
               >
                 {o.label}
               </Chip>
@@ -129,6 +153,66 @@ export function TodoSheet({ todoId, onClose }: { todoId: string; onClose: () => 
           </div>
           {when === 'date' && (
             <DateInput className="mt-2" value={todo.date ?? today} min={today} onChange={(v) => v && patch({ horizon: 'day', date: v })} />
+          )}
+        </div>
+
+        <div>
+          <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+            <Repeat size={12} /> Wiederholen
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {REPEAT_OPTIONS.map((o) => (
+              <Chip
+                key={o.value}
+                active={repeatType === o.value}
+                onClick={() => applyRepeat(o.value === 'none' ? undefined : o.value === repeatType ? todo.repeat : defaultRepeat(o.value, hasDay ? todo.date! : today))}
+              >
+                {o.label}
+              </Chip>
+            ))}
+          </div>
+          {todo.repeat && (
+            <div className="mt-3 space-y-3 rounded-2xl border border-line bg-surface/60 p-3">
+              {todo.repeat.type === 'weekly' && (
+                <WeekdayPicker
+                  value={todo.repeat.weekdays}
+                  weekStartsOn={weekStartsOn}
+                  onChange={(weekdays) => weekdays.length > 0 && applyRepeat({ ...todo.repeat!, weekdays } as TodoRepeat)}
+                />
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Alle">
+                  <NumberInput
+                    value={todo.repeat.every}
+                    min={1}
+                    max={52}
+                    suffix={REPEAT_UNIT[todo.repeat.type]}
+                    onChange={(v) => applyRepeat({ ...todo.repeat!, every: Math.min(52, Math.max(1, Math.round(v) || 1)) })}
+                  />
+                </Field>
+                {todo.repeat.type === 'monthly' && (
+                  <Field label="Am Tag">
+                    <NumberInput
+                      value={todo.repeat.day}
+                      min={1}
+                      max={31}
+                      suffix="."
+                      onChange={(v) => applyRepeat({ ...todo.repeat!, day: Math.min(31, Math.max(1, Math.round(v) || 1)) } as TodoRepeat)}
+                    />
+                  </Field>
+                )}
+              </div>
+              <div className="space-y-1 text-xs leading-relaxed">
+                <p className="text-ink-muted">
+                  <span className="font-medium text-ink">{repeatLabel(todo.repeat)}</span>
+                  {hasDay && ` · fällig ${relativeDayLabel(todo.date!, today)}`}
+                  {afterNext && ` · danach ${relativeDayLabel(afterNext, today)}`}
+                </p>
+                <p className="text-ink-faint">
+                  Nach dem Abhaken erscheint automatisch das nächste Vorkommen. Verpasstes stapelt sich nicht – das To-do rückt auf das letzte fällige Vorkommen.
+                </p>
+              </div>
+            </div>
           )}
         </div>
 

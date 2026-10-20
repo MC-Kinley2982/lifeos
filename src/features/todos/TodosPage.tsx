@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, Eye, EyeOff, ListChecks, Sparkles } from 'lucide-react';
+import { hrefFor, PATHS } from '../../app/router';
 import { toDateKey } from '../../domain/time';
 import type { Todo } from '../../domain/types';
 import { groupTodos, TODO_SECTION_LABEL, type TodoSection } from '../../services/todos/todos';
@@ -99,7 +100,11 @@ export function TodosPage() {
           <ListChecks size={14} className="mt-0.5 shrink-0" />
           <span>
             Ein To-do steht nur auf deiner Liste und blockiert keine Zeit. Mit <Sparkles size={11} className="inline text-violet-300" /> „Planen“ (To-do antippen)
-            sucht LifeOS einen passenden freien Zeitraum.
+            sucht LifeOS einen passenden freien Zeitraum. Per Siri hinzufügen:{' '}
+            <a href={hrefFor(PATHS.settings('kurzbefehle'))} className="text-violet-300 hover:underline">
+              Kurzbefehl einrichten
+            </a>
+            .
           </span>
         </p>
       </div>
