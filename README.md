@@ -96,7 +96,8 @@ LifeOS damit, bis die Daten bereit sind.
 1. App **Kurzbefehle** → **+**.
 2. Aktion **„Nach Eingabe fragen“** (Text), Frage z. B. „Was soll auf die Liste?“.
 3. Aktion **„URL codieren“** (engl. „URL Encode“) mit *Bereitgestellte Eingabe*.
-4. Aktion **„URL“**: `https://mc-kinley2982.github.io/lifeos/#/todos?add=` + Variable *URL-codierter Text* + `&when=today`.
+4. Aktion **„URL“**: `https://mc-kinley2982.github.io/lifeos/#/todos?add=` + Variable *URL-codierter Text*
+   (ohne `when` – dann erkennt LifeOS „morgen …“, „Freitag 17 Uhr …“ im gesprochenen Text, sonst gilt heute).
 5. Aktion **„URLs öffnen“**.
 6. Kurzbefehl **„To-do hinzufügen“** nennen → „Hey Siri, To-do hinzufügen“.
 

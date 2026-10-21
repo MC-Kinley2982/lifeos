@@ -35,7 +35,8 @@ export function ShortcutsSection() {
   const signedIn = useCloud((s) => !!s.session);
   const [text, setText] = useState('Sporttasche packen');
   const [when, setWhen] = useState('today');
-  const template = `${appUrl()}#/todos?add=TEXT&when=today`;
+  // Ohne "when": LifeOS erkennt "morgen …", "Freitag …" im gesprochenen Text selbst, sonst gilt heute.
+  const template = `${appUrl()}#/todos?add=TEXT`;
 
   return (
     <div className="space-y-4">
