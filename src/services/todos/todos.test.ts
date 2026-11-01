@@ -8,7 +8,7 @@ import { planTasks } from '../planner/autoPlan';
 import { planningBudget } from '../planner/freeTime';
 import { buildDaySchedule } from '../planner/schedule';
 import type { PlannerData } from '../planner/types';
-import { groupTodos, todosForDay, whenToFields } from './todos';
+import { fieldsToWhen, groupTodos, groupTodosByPriority, todoDeadline, todoDeadlineHint, todoLevel, todoSection, todosForDay, whenToFields } from './todos';
 
 const MON: DateKey = '2026-10-05';
 const TUE: DateKey = '2026-10-06';
@@ -113,6 +113,88 @@ describe('Abschnitte: Heute · Diese Woche · Später', () => {
     const hidden = groupTodos(list, TUE, 0, true);
     expect([...hidden.today, ...hidden.done]).toHaveLength(0);
     expect(todosForDay(list, TUE, TUE).map((t) => t.id)).toEqual(['a']);
+  });
+});
+
+describe('Wichtigkeit, Frist und Zeitraum', () => {
+  const WED: DateKey = '2026-10-07';
+  const FRI: DateKey = '2026-10-09';
+
+  it('nach Wichtigkeit: heute Fälliges zuerst, dann hoch · mittel · niedrig, innerhalb nach Frist', () => {
+    const list = [
+      todo('low-today', 'Niedrig, heute', { horizon: 'day', date: TUE, priority: 'low' }),
+      todo('high-later', 'Hoch, ohne Datum', { priority: 'high' }),
+      todo('mid-fri', 'Mittel, Freitag', { horizon: 'day', date: FRI }),
+      todo('mid-wed', 'Mittel, Mittwoch', { horizon: 'day', date: WED }),
+      todo('mid-none', 'Mittel, ohne Datum'),
+      todo('low-later', 'Niedrig, ohne Datum', { priority: 'low' }),
+      todo('urgent-today', 'Dringend, heute', { horizon: 'day', date: TUE, priority: 'urgent' }),
+    ];
+    const g = groupTodosByPriority(list, TUE, 0);
+    expect(g.dueToday.map((t) => t.id)).toEqual(['urgent-today', 'low-today']);
+    expect(g.high.map((t) => t.id)).toEqual(['high-later']);
+    expect(g.medium.map((t) => t.id)).toEqual(['mid-wed', 'mid-fri', 'mid-none']);
+    expect(g.low.map((t) => t.id)).toEqual(['low-later']);
+  });
+
+  it('eine Frist holt ein To-do nach vorn – fällig heute oder überfällig steht unter Heute', () => {
+    expect(todoSection(todo('a', 'A', { dueDate: TUE }), TUE, 0)).toBe('today');
+    expect(todoSection(todo('b', 'B', { dueDate: MON }), TUE, 0)).toBe('today');
+    expect(todoSection(todo('c', 'C', { horizon: 'week', date: MON, dueDate: FRI }), TUE, 0)).toBe('week');
+    expect(todoSection(todo('d', 'D', { dueDate: FRI }), TUE, 0)).toBe('week');
+    expect(todoSection(todo('e', 'E', { dueDate: '2026-10-20' }), TUE, 0)).toBe('later');
+  });
+
+  it('nach Frist: früheste Frist zuerst, bei gleichem Tag die wichtigere', () => {
+    const list = [
+      todo('later', 'Ohne Frist'),
+      todo('fri', 'Frist Freitag', { dueDate: FRI, priority: 'high' }),
+      todo('wed-low', 'Frist Mittwoch niedrig', { dueDate: WED, priority: 'low' }),
+      todo('wed-high', 'Frist Mittwoch hoch', { dueDate: WED, priority: 'high' }),
+    ];
+    expect(groupTodos(list, TUE, 0).week.map((t) => t.id)).toEqual(['wed-high', 'wed-low', 'fri']);
+    expect(groupTodos(list, TUE, 0).later.map((t) => t.id)).toEqual(['later']);
+  });
+
+  it('Zeitraum: beginnt in der Zukunft unter Woche/Später, läuft dann unter Heute; Ende ist die Frist', () => {
+    const range = todo('r', 'Referat', { horizon: 'day', date: WED, endDate: FRI });
+    expect(todoSection(range, TUE, 0)).toBe('week');
+    expect(todoSection(range, WED, 0)).toBe('today');
+    expect(todoDeadline(range)).toBe(FRI);
+    expect(todosForDay([range], TUE, TUE)).toHaveLength(0);
+    expect(todosForDay([range], WED, TUE).map((t) => t.id)).toEqual(['r']);
+    expect(todosForDay([range], '2026-10-08', TUE).map((t) => t.id)).toEqual(['r']);
+    expect(todosForDay([range], FRI, TUE).map((t) => t.id)).toEqual(['r']);
+    expect(todosForDay([range], SAT, TUE)).toHaveLength(0);
+    expect(todosForDay([range], WED, WED).map((t) => t.id)).toEqual(['r']);
+  });
+
+  it('Frist erscheint am Tag der Frist und ab heute bei Überfälligem', () => {
+    const t = todo('d', 'Antrag', { horizon: 'week', date: MON, dueDate: FRI });
+    expect(todosForDay([t], FRI, TUE).map((x) => x.id)).toEqual(['d']);
+    expect(todosForDay([t], TUE, TUE)).toHaveLength(0);
+    expect(todosForDay([t], SAT, SAT).map((x) => x.id)).toEqual(['d']);
+  });
+
+  it('whenToFields/fieldsToWhen: Zeitraum hin und zurück, Wechsel löscht das Ende', () => {
+    const range = whenToFields('range', TUE, 0, TUE);
+    expect(range).toMatchObject({ horizon: 'day', date: TUE, endDate: '2026-10-08' });
+    expect(fieldsToWhen(range, TUE)).toBe('range');
+    expect(whenToFields('range', TUE, 0, TUE, FRI).endDate).toBe(FRI);
+    expect(whenToFields('today', TUE, 0).endDate).toBeUndefined();
+    expect('endDate' in whenToFields('later', TUE, 0)).toBe(true);
+  });
+
+  it('Fristhinweis: überfällig wird markiert', () => {
+    expect(todoDeadlineHint(todo('a', 'A', { dueDate: FRI }), TUE)).toMatchObject({ overdue: false, text: expect.stringContaining('Frist') });
+    expect(todoDeadlineHint(todo('b', 'B', { dueDate: MON }), TUE)).toMatchObject({ overdue: true });
+    expect(todoDeadlineHint(todo('c', 'C'), TUE)).toBeUndefined();
+  });
+
+  it('Wichtigkeit: leer = mittel, dringend = hoch', () => {
+    expect(todoLevel({})).toBe('medium');
+    expect(todoLevel({ priority: 'urgent' })).toBe('high');
+    expect(todoLevel({ priority: 'low' })).toBe('low');
   });
 });
 

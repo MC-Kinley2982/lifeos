@@ -1,8 +1,8 @@
-import { Bell, CalendarCheck, Check, Clock, Flag, Repeat, Sparkles, StickyNote, Timer } from 'lucide-react';
+import { Bell, CalendarCheck, CalendarClock, Check, Clock, Flag, Repeat, Sparkles, StickyNote, Timer } from 'lucide-react';
 import { formatDuration, relativeDayLabel } from '../../domain/time';
 import type { DateKey, Todo } from '../../domain/types';
 import { repeatLabel } from '../../services/todos/repeat';
-import { todoDayHint } from '../../services/todos/todos';
+import { todoDayHint, todoDeadlineHint, todoLevel } from '../../services/todos/todos';
 import { useAppStore } from '../../store/useAppStore';
 import { cn } from '../../ui/cn';
 
@@ -14,7 +14,10 @@ export function TodoRow({ todo, today, onOpen }: { todo: Todo; today: DateKey; o
   const toggleTodo = useAppStore((s) => s.toggleTodo);
   const task = useAppStore((s) => (todo.taskId ? s.tasks.find((t) => t.id === todo.taskId) : undefined));
   const dayHint = todoDayHint(todo, today);
+  const deadlineHint = todoDeadlineHint(todo, today);
   const overdue = !todo.completed && todo.horizon === 'day' && !!todo.date && todo.date < today;
+  const level = todoLevel(todo);
+  const showLevel = !todo.completed && level !== 'medium';
   const planned = !!task;
   const slot = task?.schedule?.start ? `${task.schedule.date === today ? '' : `${relativeDayLabel(task.schedule.date, today)} `}${task.schedule.start}` : undefined;
 
@@ -38,7 +41,7 @@ export function TodoRow({ todo, today, onOpen }: { todo: Todo; today: DateKey; o
       </button>
       <button type="button" onClick={() => onOpen(todo)} className="flex min-w-0 flex-1 flex-col justify-center py-2.5 pr-3 text-left">
         <span className={cn('text-[15px] leading-snug break-words', todo.completed && 'text-ink-faint line-through')}>{todo.title}</span>
-        {(dayHint || todo.time || todo.reminder || todo.googleCalendarSync || planned || todo.note || todo.repeat || todo.estimatedMin || todo.priority === 'high' || todo.priority === 'urgent') && (
+        {(dayHint || deadlineHint || todo.time || todo.reminder || todo.googleCalendarSync || planned || todo.note || todo.repeat || todo.estimatedMin || showLevel) && (
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-ink-muted">
             {planned && (
               <span className="inline-flex items-center gap-1 font-medium text-violet-300">
@@ -47,6 +50,12 @@ export function TodoRow({ todo, today, onOpen }: { todo: Todo; today: DateKey; o
               </span>
             )}
             {dayHint && <span className={cn(overdue && 'text-amber-300')}>{dayHint}</span>}
+            {deadlineHint && (
+              <span className={cn('inline-flex items-center gap-1', deadlineHint.overdue && 'font-medium text-amber-300')}>
+                <CalendarClock size={11} />
+                {deadlineHint.text}
+              </span>
+            )}
             {todo.time && !slot && (
               <span className="inline-flex items-center gap-1 tabular">
                 <Clock size={11} />
@@ -68,10 +77,10 @@ export function TodoRow({ todo, today, onOpen }: { todo: Todo; today: DateKey; o
             {todo.reminder && <Bell size={11} aria-label="Erinnerung" />}
             {todo.googleCalendarSync && <CalendarCheck size={11} aria-label="In Google Kalender" />}
             {todo.note && <StickyNote size={11} aria-label="Notiz" />}
-            {(todo.priority === 'high' || todo.priority === 'urgent') && !todo.completed && (
-              <span className="inline-flex items-center gap-1 text-orange-300">
+            {showLevel && (
+              <span className={cn('inline-flex items-center gap-1', level === 'high' ? 'text-orange-300' : 'text-sky-300')}>
                 <Flag size={11} />
-                Wichtig
+                {level === 'high' ? 'Hohe Priorität' : 'Niedrige Priorität'}
               </span>
             )}
           </span>

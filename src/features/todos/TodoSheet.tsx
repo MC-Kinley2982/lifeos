@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from 'react';
-import { Bell, CalendarCheck, Repeat, Sparkles, X } from 'lucide-react';
+import { Bell, CalendarCheck, CalendarClock, Flag, Repeat, Sparkles, X } from 'lucide-react';
 import { hrefFor, PATHS } from '../../app/router';
-import { formatDuration, relativeDayLabel, toDateKey, toHHMM, toMinutes } from '../../domain/time';
+import { addDays, formatDuration, relativeDayLabel, startOfWeek, toDateKey, toHHMM, toMinutes } from '../../domain/time';
 import type { Todo, TodoRepeat } from '../../domain/types';
 import { defaultRepeat, firstOccurrenceFrom, nextOccurrence, occursOn, repeatLabel, type RepeatType } from '../../services/todos/repeat';
-import { fieldsToWhen, whenToFields, type TodoWhen } from '../../services/todos/todos';
+import { fieldsToWhen, TODO_LEVEL_LABEL, todoLevel, whenToFields, type TodoLevel, type TodoWhen } from '../../services/todos/todos';
 import { useNow } from '../../store/hooks';
 import { planTodo, TODO_PLAN_MINUTES, unplanTodo, type TodoPlanOutcome } from '../../store/todoPlanning';
 import { useAppStore } from '../../store/useAppStore';
@@ -20,7 +20,19 @@ const WHEN_OPTIONS: Array<{ value: TodoWhen; label: string }> = [
   { value: 'week', label: 'Woche' },
   { value: 'later', label: 'Später' },
   { value: 'date', label: 'Datum' },
+  { value: 'range', label: 'Zeitraum' },
 ];
+
+type DueChoice = 'none' | 'today' | 'tomorrow' | 'date';
+
+const DUE_OPTIONS: Array<{ value: DueChoice; label: string }> = [
+  { value: 'none', label: 'Keine' },
+  { value: 'today', label: 'Heute' },
+  { value: 'tomorrow', label: 'Morgen' },
+  { value: 'date', label: 'Datum' },
+];
+
+const LEVEL_OPTIONS = (['low', 'medium', 'high'] as TodoLevel[]).map((value) => ({ value, label: TODO_LEVEL_LABEL[value] }));
 
 const REPEAT_OPTIONS: Array<{ value: RepeatType | 'none'; label: string }> = [
   { value: 'none', label: 'Nie' },
@@ -91,8 +103,19 @@ export function TodoSheet({ todoId, onClose }: { todoId: string; onClose: () => 
     if (!rule) return patch({ repeat: undefined });
     const keep = hasDay && occursOn(rule, todo.date!) ? todo.date! : undefined;
     const date = keep ?? firstOccurrenceFrom(rule, today) ?? today;
-    patch({ repeat: { ...rule, anchor: date } as TodoRepeat, horizon: 'day', date });
+    // Eine Wiederholung braucht einen einzelnen Tag – Frist und Zeitraum fallen dann weg.
+    patch({ repeat: { ...rule, anchor: date } as TodoRepeat, horizon: 'day', date, dueDate: undefined, endDate: undefined });
   };
+  const dueChoice: DueChoice = !todo.dueDate ? 'none' : todo.dueDate === today ? 'today' : todo.dueDate === addDays(today, 1) ? 'tomorrow' : 'date';
+  const setDue = (choice: DueChoice) => {
+    if (choice === 'none') return patch({ dueDate: undefined });
+    if (choice === 'today') return patch({ dueDate: today });
+    if (choice === 'tomorrow') return patch({ dueDate: addDays(today, 1) });
+    const weekEnd = addDays(startOfWeek(today, weekStartsOn), 6);
+    patch({ dueDate: todo.dueDate && dueChoice === 'date' ? todo.dueDate : weekEnd > addDays(today, 1) ? weekEnd : addDays(today, 7) });
+  };
+  // Bei "Heute/Morgen/Datum" ist der Tag selbst die Frist; bei "Zeitraum" das Ende – eine eigene Frist gibt es nur für Woche/Später.
+  const showDue = !todo.repeat && (when === 'week' || when === 'later');
   const repeatType: RepeatType | 'none' = todo.repeat?.type ?? 'none';
   const afterNext = todo.repeat && hasDay ? nextOccurrence(todo.repeat, todo.date! > today ? todo.date! : today) : undefined;
 
@@ -142,9 +165,10 @@ export function TodoSheet({ todoId, onClose }: { todoId: string; onClose: () => 
                 key={o.value}
                 active={when === o.value}
                 onClick={() => {
-                  const fields = whenToFields(o.value, today, weekStartsOn, o.value === 'date' ? (todo.date ?? today) : undefined);
-                  // Eine Wiederholung braucht einen festen Tag.
-                  patch({ ...fields, ...(fields.horizon !== 'day' ? { repeat: undefined } : {}) });
+                  const day = todo.horizon === 'day' && todo.date ? todo.date : today;
+                  const fields = whenToFields(o.value, today, weekStartsOn, o.value === 'date' || o.value === 'range' ? day : undefined, todo.endDate);
+                  // Eine Wiederholung braucht einen festen Tag; bei einem festen Tag oder Zeitraum ist der Tag selbst die Frist.
+                  patch({ ...fields, ...(fields.horizon !== 'day' || fields.endDate ? { repeat: undefined } : {}), ...(fields.horizon === 'day' ? { dueDate: undefined } : {}) });
                 }}
               >
                 {o.label}
@@ -154,6 +178,42 @@ export function TodoSheet({ todoId, onClose }: { todoId: string; onClose: () => 
           {when === 'date' && (
             <DateInput className="mt-2" value={todo.date ?? today} min={today} onChange={(v) => v && patch({ horizon: 'day', date: v })} />
           )}
+          {when === 'range' && todo.date && todo.endDate && (
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <Field label="Von">
+                <DateInput
+                  value={todo.date}
+                  onChange={(v) => v && patch({ date: v, endDate: todo.endDate! < v ? v : todo.endDate })}
+                />
+              </Field>
+              <Field label="Bis (Frist)">
+                <DateInput value={todo.endDate} min={todo.date} onChange={(v) => v && patch({ endDate: v < todo.date! ? todo.date : v })} />
+              </Field>
+            </div>
+          )}
+        </div>
+
+        {showDue && (
+          <div>
+            <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+              <CalendarClock size={12} /> Frist – bis wann muss es fertig sein?
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {DUE_OPTIONS.map((o) => (
+                <Chip key={o.value} active={dueChoice === o.value} onClick={() => setDue(o.value)}>
+                  {o.label}
+                </Chip>
+              ))}
+            </div>
+            {dueChoice === 'date' && todo.dueDate && <DateInput className="mt-2" value={todo.dueDate} min={today} onChange={(v) => v && patch({ dueDate: v })} />}
+          </div>
+        )}
+
+        <div>
+          <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+            <Flag size={12} /> Wichtigkeit
+          </span>
+          <Segmented<TodoLevel> value={todoLevel(todo)} onChange={(v) => patch({ priority: v })} options={LEVEL_OPTIONS} />
         </div>
 
         <div>
@@ -216,37 +276,25 @@ export function TodoSheet({ todoId, onClose }: { todoId: string; onClose: () => 
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Uhrzeit (optional)">
-            {todo.time ? (
-              <div className="flex gap-1.5">
-                <TimeInput value={todo.time} onChange={(v) => patch({ time: v })} />
-                <button
-                  type="button"
-                  aria-label="Uhrzeit entfernen"
-                  onClick={() => patch({ time: undefined, reminder: undefined })}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-ink-faint hover:bg-white/5 hover:text-ink"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ) : (
-              <Button block onClick={() => patch({ time: defaultTime })}>
-                Uhrzeit festlegen
-              </Button>
-            )}
-          </Field>
-          <Field label="Wichtig?">
-            <Segmented<'normal' | 'high'>
-              value={todo.priority === 'high' || todo.priority === 'urgent' ? 'high' : 'normal'}
-              onChange={(v) => patch({ priority: v === 'high' ? 'high' : undefined })}
-              options={[
-                { value: 'normal', label: 'Normal' },
-                { value: 'high', label: 'Wichtig' },
-              ]}
-            />
-          </Field>
-        </div>
+        <Field label="Uhrzeit (optional)">
+          {todo.time ? (
+            <div className="flex max-w-xs gap-1.5">
+              <TimeInput value={todo.time} onChange={(v) => patch({ time: v })} />
+              <button
+                type="button"
+                aria-label="Uhrzeit entfernen"
+                onClick={() => patch({ time: undefined, reminder: undefined })}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-ink-faint hover:bg-white/5 hover:text-ink"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <Button className="max-w-xs" block onClick={() => patch({ time: defaultTime })}>
+              Uhrzeit festlegen
+            </Button>
+          )}
+        </Field>
 
         <Field label="Notiz (optional)">
           <TextArea value={todo.note ?? ''} onChange={(e) => patch({ note: e.target.value || undefined })} className="text-base" />

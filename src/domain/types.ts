@@ -205,6 +205,8 @@ export interface UiSettings {
   hideCompletedTodos: boolean;
   /** Schnelleingabe erkennt Tag, Uhrzeit, Dauer, Wiederholung und Wichtigkeit im Text ("morgen 17 Uhr …"). */
   smartQuickAdd: boolean;
+  /** Sortierung der To-do-Liste: nach Wichtigkeit (Standard) oder nach Frist. */
+  todoSort: 'priority' | 'deadline';
 }
 
 // ─── Integrationen ───────────────────────────────────────────
@@ -450,7 +452,12 @@ export interface Todo {
   date?: DateKey;
   /** Optionale Uhrzeit (z. B. für eine Erinnerung). */
   time?: TimeHHMM;
+  /** Wichtigkeit: niedrig · mittel (Standard, wenn leer) · hoch. "urgent" (aus der Schnelleingabe) zählt wie hoch. */
   priority?: Priority;
+  /** Frist: Bis wann es erledigt sein muss – unabhängig von "Wann?" (z. B. diese Woche, aber bis Freitag). */
+  dueDate?: DateKey;
+  /** Zeitraum: Ende eines Zeitraums, der bei `date` (horizon "day") beginnt. Das Ende ist zugleich die Frist. */
+  endDate?: DateKey;
   note?: string;
   /** Standardmäßig keine Erinnerung. Zugestellt wird sie über Google Kalender. */
   reminder?: TodoReminder;

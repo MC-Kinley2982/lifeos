@@ -296,7 +296,7 @@ export function createDefaultSettings(name = ''): Settings {
     planning: defaultPlanningSettings(),
     school: defaultSchoolSettings(),
     vocab: defaultVocabSettings(),
-    ui: { weekStartsOn: 0, hideCompletedTodos: false, smartQuickAdd: true },
+    ui: { weekStartsOn: 0, hideCompletedTodos: false, smartQuickAdd: true, todoSort: 'priority' },
     integrations: defaultIntegrationSettings(),
   };
 }
