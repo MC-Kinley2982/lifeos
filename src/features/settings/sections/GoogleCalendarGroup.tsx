@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, Link2Off, LogIn, RefreshCw } from 'lucide-react';
+import { CalendarDays, Link2Off, LogIn, RefreshCw, UserRound } from 'lucide-react';
 import type { GoogleReminder, GoogleSyncCategory } from '../../../domain/types';
 import { googleCalendar, useGoogle } from '../../../store/googleCalendar';
 import { useAppStore } from '../../../store/useAppStore';
@@ -38,6 +38,8 @@ export function GoogleCalendarGroup() {
   const settings = useAppStore((s) => s.settings.integrations.googleCalendar);
   const update = useAppStore((s) => s.updateGoogleCalendar);
   const [choosing, setChoosing] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   useEffect(() => {
@@ -137,10 +139,52 @@ export function GoogleCalendarGroup() {
           >
             Kalender ändern
           </Button>
+          <Button variant="ghost" icon={UserRound} disabled={g.busy} onClick={() => setSwitching((v) => !v)}>
+            Anderes Google-Konto
+          </Button>
           <Button variant="ghost" icon={Link2Off} disabled={g.busy} onClick={() => setConfirmDisconnect((v) => !v)}>
             Trennen
           </Button>
         </div>
+
+        {notice && <p className="mt-3 rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{notice}</p>}
+
+        {switching && (
+          <div className="mt-3 space-y-2 rounded-2xl border border-line p-3">
+            <p className="text-sm">Mit einem anderen Google-Konto weitermachen?</p>
+            <p className="text-[11px] leading-relaxed text-ink-faint">
+              Du wählst bei Google ein anderes Konto aus. LifeOS verbindet dessen Hauptkalender, überträgt alles dorthin und entfernt seine eigenen Einträge aus dem bisherigen
+              Kalender. Deine eigenen Google-Termine bleiben unangetastet. Danach kannst du über „Kalender ändern“ einen anderen Kalender dieses Kontos wählen.
+            </p>
+            {!deviceReady && (
+              <p className="text-[11px] leading-relaxed text-amber-200">
+                Du bist auf diesem Gerät gerade nicht angemeldet. Tippe vorher auf „Kurz anmelden“ – sonst bleiben die LifeOS-Einträge im bisherigen Kalender stehen und du
+                müsstest sie dort von Hand löschen.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="primary"
+                icon={UserRound}
+                disabled={g.busy}
+                onClick={() => {
+                  setNotice(null);
+                  void googleCalendar.switchAccount().then((result) => {
+                    if (!result) return; // abgebrochen oder fehlgeschlagen – Fehler steht oben
+                    setSwitching(false);
+                    if (!result.oldCleaned) setNotice('Konto gewechselt. Die LifeOS-Einträge im bisherigen Kalender konnten nicht entfernt werden und müssen dort von Hand gelöscht werden.');
+                  });
+                }}
+              >
+                Konto auswählen
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSwitching(false)}>
+                Abbrechen
+              </Button>
+            </div>
+          </div>
+        )}
 
         {choosing && (
           <div className="mt-3 space-y-1.5 rounded-2xl border border-line p-2">

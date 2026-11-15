@@ -100,9 +100,10 @@ export function clearGoogleToken(): void {
 
 /**
  * Anmelden bzw. Token erneuern – muss aus einem Klick heraus aufgerufen werden (Popup).
- * prompt "consent" beim ersten Verbinden, "" danach (keine erneute Zustimmung nötig).
+ * prompt "consent" beim ersten Verbinden, "" danach (keine erneute Zustimmung nötig),
+ * "select_account" zeigt die Kontoauswahl (z. B. um ein anderes Google-Konto zu verwenden).
  */
-export function requestGoogleToken(prompt: 'consent' | '' = '', loginHint?: string): Promise<string> {
+export function requestGoogleToken(prompt: 'consent' | 'select_account' | '' = '', loginHint?: string): Promise<string> {
   const start = (oauth2: GoogleOAuth2) =>
     new Promise<string>((resolve, reject) => {
       const client = oauth2.initTokenClient({

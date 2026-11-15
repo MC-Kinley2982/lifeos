@@ -131,6 +131,43 @@ export const googleCalendar = {
       useGoogle.setState({ calendars: await api.listCalendars(), status: 'ready' });
     }),
 
+  /**
+   * Anderes Google-Konto verwenden: Kontoauswahl bei Google (Popup direkt aus dem Klick), dann ist
+   * dessen Hauptkalender verbunden und alles wird dorthin übertragen. Die eigenen LifeOS-Einträge
+   * im bisherigen Kalender werden entfernt – sofern die Anmeldung dafür noch gilt; sonst bleiben sie
+   * dort stehen und müssen von Hand gelöscht werden (deshalb gibt das Ergebnis `oldCleaned` zurück).
+   */
+  switchAccount: () =>
+    withBusy(async () => {
+      const store = useAppStore.getState();
+      const previous = store.settings.integrations.googleCalendar.calendarId;
+      const oldToken = currentGoogleToken();
+      // Zuerst anmelden (nur so lässt der Browser das Popup zu); das alte Token merken wir uns für das Aufräumen.
+      await requestGoogleToken('select_account');
+      const calendars = await api.listCalendars();
+      const primary = calendars.find((c) => c.primary) ?? calendars[0];
+      if (!primary) throw new Error('In diesem Google-Konto wurde kein beschreibbarer Kalender gefunden.');
+
+      let oldCleaned = !previous || previous === primary.id;
+      if (previous && previous !== primary.id && oldToken) {
+        try {
+          const oldApi = createGoogleCalendarApi(async () => oldToken);
+          const range = syncRange(new Date());
+          await pushEvents(oldApi, previous, [], { from: range.from, to: addDays(range.from, 365) });
+          oldCleaned = true;
+        } catch {
+          oldCleaned = false; // altes Token abgelaufen o. Ä. – der Wechsel selbst soll trotzdem klappen
+        }
+      }
+
+      store.replaceGoogleEvents(null, []);
+      store.updateGoogleCalendar({ accountEmail: calendars.find((c) => c.primary)?.id, calendarId: primary.id, calendarName: primary.summary });
+      lastFingerprint = null;
+      useGoogle.setState({ calendars, status: 'ready' });
+      await syncOnce();
+      return { oldCleaned };
+    }),
+
   /** Anderen Kalender wählen: LifeOS-Einträge im alten Kalender werden entfernt (nur die eigenen). */
   chooseCalendar: (calendar: GCalendar) =>
     withBusy(async () => {
