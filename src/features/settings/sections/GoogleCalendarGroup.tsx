@@ -14,7 +14,8 @@ const PUSH_OPTIONS: Array<{ key: GoogleSyncCategory; label: string; description:
   { key: 'homework', label: 'Geplante Hausaufgaben', description: 'Die Zeitblöcke, die LifeOS für Hausaufgaben eingeplant hat.' },
   { key: 'study', label: 'Geplante Lernzeiten', description: 'Lerneinheiten für Tests.' },
   { key: 'todos', label: 'To-dos mit Kalendertermin', description: 'Nur To-dos, bei denen du einzeln „In Google Kalender eintragen“ einschaltest.' },
-  { key: 'routines', label: 'Routinen', description: 'Achtung: erzeugt jede Woche viele Einträge.' },
+  { key: 'routines', label: 'Routinen', description: 'Achtung: erzeugt jede Woche viele Einträge. Einzelne Routinen kannst du beim Bearbeiten davon ausnehmen. Schule zählt nicht dazu.' },
+  { key: 'school', label: 'Schule (Stundenplan)', description: 'Ein Eintrag pro Schultag von der ersten bis zur letzten Stunde. Meist unnötig – LifeOS plant auch ohne.' },
 ];
 
 type ReminderChoice = 'default' | 'none' | '10' | '30' | '60';

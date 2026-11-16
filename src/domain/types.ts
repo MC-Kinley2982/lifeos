@@ -212,7 +212,7 @@ export interface UiSettings {
 // ─── Integrationen ───────────────────────────────────────────
 
 /** Was LifeOS (nur auf Wunsch) in Google Kalender einträgt. */
-export type GoogleSyncCategory = 'events' | 'homework' | 'study' | 'todos' | 'routines';
+export type GoogleSyncCategory = 'events' | 'homework' | 'study' | 'todos' | 'routines' | 'school';
 
 /** Erinnerung für Einträge, die LifeOS in Google Kalender anlegt. */
 export type GoogleReminder = { type: 'calendarDefault' } | { type: 'none' } | { type: 'minutes'; minutes: number };
@@ -345,6 +345,11 @@ export interface Routine {
   /** Blockiert die Routine freie Zeit? (z. B. "Lesen (optional)" → nein) */
   blocksFreeTime: boolean;
   enabled: boolean;
+  /**
+   * In Google Kalender eintragen, wenn "Routinen" dort aktiv ist? Ohne Angabe = ja.
+   * Schulblöcke (auch einer verknüpften Schul-Routine) steuert nur der Schalter "Schule".
+   */
+  googleSync?: boolean;
   /** Weg-/Vorbereitungszeit vor bzw. nach der Routine. */
   travelBeforeMin: number;
   travelAfterMin: number;

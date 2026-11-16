@@ -117,6 +117,12 @@ export function RoutineForm({ routine, onClose }: { routine?: Routine; onClose: 
         <div className="rounded-2xl border border-line bg-surface px-4 py-2">
           <Toggle checked={draft.blocksFreeTime} onChange={(v) => set('blocksFreeTime', v)} label="Blockiert freie Zeit" description="Aus = wird angezeigt, zählt aber als frei (z. B. optionales Lesen)." />
           <Toggle checked={draft.enabled} onChange={(v) => set('enabled', v)} label="Aktiv" description="Deaktivierte Routinen erscheinen nirgends." />
+          <Toggle
+            checked={draft.googleSync !== false}
+            onChange={(v) => set('googleSync', v)}
+            label="In Google Kalender eintragen"
+            description="Nur wirksam, wenn die Synchronisierung von Routinen in den Einstellungen eingeschaltet ist."
+          />
         </div>
 
         <div>

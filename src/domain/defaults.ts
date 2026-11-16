@@ -194,7 +194,7 @@ export function defaultIntegrationSettings(): IntegrationSettings {
   return {
     googleCalendar: {
       importEvents: true,
-      push: { events: false, homework: false, study: false, todos: false, routines: false },
+      push: { events: false, homework: false, study: false, todos: false, routines: false, school: false },
       reminder: { type: 'calendarDefault' },
     },
   };

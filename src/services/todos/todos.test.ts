@@ -210,6 +210,6 @@ describe('Migration', () => {
     expect(data.routines).toEqual(ex.routines);
     expect(data.settings.planning.protectedPeriods.map((p) => p.name)).toEqual(['Morgenroutine']);
     expect(data.settings.school.minBlockMin).toBe(30);
-    expect(data.settings.integrations.googleCalendar.push).toEqual({ events: false, homework: false, study: false, todos: false, routines: false });
+    expect(data.settings.integrations.googleCalendar.push).toEqual({ events: false, homework: false, study: false, todos: false, routines: false, school: false });
   });
 });

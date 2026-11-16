@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleData, defaultIntegrationSettings } from '../../domain/defaults';
+import { CATEGORY_IDS, createExampleData, defaultIntegrationSettings } from '../../domain/defaults';
+import { routineSource, SCHOOL_SOURCE } from '../../domain/sources';
+import { addDays } from '../../domain/time';
 import type { CalendarEvent, DateKey, GoogleCalendarSettings, Todo } from '../../domain/types';
 import { GoogleApiError, type GEvent, type GoogleCalendarApi } from './api';
-import { eventIdFor, LIFEOS_MARK, mapGoogleEvents, syncGoogleCalendar, type GoogleSyncData } from './sync';
+import { buildDesiredEvents, eventIdFor, LIFEOS_MARK, mapGoogleEvents, syncGoogleCalendar, type GoogleSyncData } from './sync';
 
 const TODAY: DateKey = '2026-10-06';
 const NOW = new Date(`${TODAY}T09:00:00`);
@@ -83,6 +85,35 @@ describe('Google Kalender: Übertragen', () => {
     const result = await syncGoogleCalendar(g.api, makeData(), NOW, TZ);
     expect(result.push).toMatchObject({ created: 0, updated: 0, deleted: 0 });
     expect(g.events.size).toBe(0);
+  });
+
+  it('Routinen: Schule nur mit eigenem Schalter, einzelne Routinen abwählbar', () => {
+    const range = { from: TODAY, to: addDays(TODAY, 14) };
+    const keys = (data: GoogleSyncData) => buildDesiredEvents(data, data.settings.integrations.googleCalendar, range, TZ).map((d) => d.key);
+    const nonSchool = (data: GoogleSyncData) => data.routines.filter((r) => r.categoryId !== CATEGORY_IDS.school);
+
+    const routinesOnly = makeData({ routines: true });
+    const all = keys(routinesOnly);
+    expect(all.length).toBeGreaterThan(0);
+    // Schule ist nicht dabei – weder als Schulblock noch über die verknüpfte Schul-Routine
+    expect(all.some((k) => k.includes(SCHOOL_SOURCE))).toBe(false);
+    for (const r of routinesOnly.routines.filter((x) => x.categoryId === CATEGORY_IDS.school)) {
+      expect(all.some((k) => k.startsWith(`routine:${routineSource(r.id)}:`))).toBe(false);
+    }
+
+    // Eine Routine abwählen → ihre Einträge verschwinden, die anderen bleiben
+    const target = nonSchool(routinesOnly).find((r) => all.some((k) => k.startsWith(`routine:${routineSource(r.id)}:`)));
+    expect(target).toBeDefined();
+    const without = { ...routinesOnly, routines: routinesOnly.routines.map((r) => (r.id === target!.id ? { ...r, googleSync: false } : r)) };
+    const reduced = keys(without);
+    expect(reduced.some((k) => k.startsWith(`routine:${routineSource(target!.id)}:`))).toBe(false);
+    expect(reduced.length).toBeLessThan(all.length);
+    expect(reduced.length).toBeGreaterThan(0);
+
+    // Nur Schule eingeschaltet → nur Schulblöcke
+    const schoolOnly = keys(makeData({ school: true }));
+    expect(schoolOnly.length).toBeGreaterThan(0);
+    expect(schoolOnly.filter((k) => all.includes(k))).toEqual([]);
   });
 
   it('keine doppelten Events durch wiederholte Synchronisierung – auch nicht von zwei Geräten', async () => {

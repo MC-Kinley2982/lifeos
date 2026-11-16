@@ -1,4 +1,5 @@
 import { CATEGORY_IDS } from '../../domain/defaults';
+import { routineSource } from '../../domain/sources';
 import { addDays, MINUTES_PER_DAY, minutesSinceMidnight, toDateKey, toHHMM, toMinutes } from '../../domain/time';
 import type { CalendarEvent, DateKey, GoogleCalendarSettings, GoogleReminder, ID, Todo } from '../../domain/types';
 import { buildDaySchedule } from '../planner/schedule';
@@ -196,10 +197,12 @@ export function buildDesiredEvents(data: GoogleSyncData, settings: GoogleCalenda
     }
   }
 
-  if (push.routines) {
+  // Routinen und Schule getrennt: Schule nur mit eigenem Schalter, Routinen einzeln abwählbar.
+  if (push.routines || push.school) {
+    const optedOut = new Set(data.routines.filter((r) => r.googleSync === false).map((r) => routineSource(r.id)));
     for (let d = range.from; d < range.to; d = addDays(d, 1)) {
       for (const b of buildDaySchedule(data, d).blocks) {
-        if (b.kind !== 'routine' && b.kind !== 'school') continue;
+        if (b.kind === 'school' ? !push.school : b.kind !== 'routine' || !push.routines || optedOut.has(b.sourceKey)) continue;
         out.push(desired(`routine:${b.sourceKey}:${d}`, { summary: b.title, description: `Routine · ${NOTE}`, ...timed(d, b.start, b.end, timeZone), reminders }));
       }
     }
