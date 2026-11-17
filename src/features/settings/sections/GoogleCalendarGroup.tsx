@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Link2Off, LogIn, RefreshCw, UserRound } from 'lucide-react';
+import { relativeDayLabel, toDateKey } from '../../../domain/time';
 import type { GoogleReminder, GoogleSyncCategory } from '../../../domain/types';
+import { syncOverview } from '../../../services/google/sync';
 import { googleCalendar, useGoogle } from '../../../store/googleCalendar';
+import { pickData } from '../../../store/persistence';
 import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../../ui/Button';
 import { cn } from '../../../ui/cn';
@@ -28,6 +31,57 @@ const fromChoice = (c: ReminderChoice): GoogleReminder =>
 function formatTime(iso?: string): string {
   if (!iso) return '–';
   return new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+/** "Das steht in deinem Kalender": was die aktuellen Schalter in Google ergeben (nächste 4 Wochen). */
+function SyncOverviewCard({ importedCount }: { importedCount?: number }) {
+  const state = useAppStore();
+  const overview = useMemo(() => {
+    const now = new Date();
+    return syncOverview(pickData(state), now, Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin');
+  }, [state]);
+  const today = toDateKey(new Date());
+  const active = PUSH_OPTIONS.filter((o) => overview.counts[o.key] > 0);
+
+  return (
+    <SettingsGroup
+      title="Das steht gerade in deinem Google Kalender"
+      description="Von LifeOS eingetragen, für die nächsten 4 Wochen – so wie es die Schalter unten gerade vorgeben."
+    >
+      {overview.total === 0 ? (
+        <p className="text-sm text-ink-muted">Aktuell trägt LifeOS nichts in Google ein. Schalte unten ein, was du dort sehen willst.</p>
+      ) : (
+        <>
+          <p className="mb-2 text-sm">
+            <span className="font-medium tabular">{overview.total}</span> Einträge
+          </p>
+          <ul className="divide-y divide-line text-sm">
+            {active.map((o) => (
+              <li key={o.key} className="flex items-center justify-between py-1.5">
+                <span className="text-ink-muted">{o.label}</span>
+                <span className="tabular">{overview.counts[o.key]}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 mb-1 text-xs font-semibold tracking-wide text-ink-muted uppercase">Als Nächstes</div>
+          <ul className="space-y-1 text-sm">
+            {overview.upcoming.map((u, i) => (
+              <li key={i} className="flex items-baseline gap-2">
+                <span className="w-24 shrink-0 text-xs text-ink-faint tabular">
+                  {relativeDayLabel(u.date, today)}
+                  {u.time ? ` · ${u.time}` : ''}
+                </span>
+                <span className="truncate">{u.title}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="mt-3 text-[11px] text-ink-faint">
+        {importedCount !== undefined ? `Umgekehrt liest LifeOS ${importedCount} Google-Termine (nicht von LifeOS) beim letzten Abgleich.` : 'Deine eigenen Google-Termine liest LifeOS nur und verändert sie nie.'}
+      </p>
+    </SettingsGroup>
+  );
 }
 
 /**
@@ -246,6 +300,8 @@ export function GoogleCalendarGroup() {
           </div>
         )}
       </SettingsGroup>
+
+      <SyncOverviewCard importedCount={last?.imported} />
 
       <SettingsGroup
         title="Was wird abgeglichen?"

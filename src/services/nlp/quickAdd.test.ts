@@ -128,6 +128,21 @@ describe('Priorität', () => {
     expect(p('Formular abgeben !!')).toMatchObject({ title: 'Formular abgeben', priority: 'urgent' });
     expect(p('Wichtige Mail schreiben').priority).toBeUndefined();
   });
+
+  it('ausdrücklich genannte Stufe: hoch, mittel, niedrig', () => {
+    expect(p('Referat vorbereiten hohe Priorität')).toMatchObject({ title: 'Referat vorbereiten', priority: 'high' });
+    expect(p('prio hoch Referat vorbereiten')).toMatchObject({ title: 'Referat vorbereiten', priority: 'high' });
+    expect(p('Zimmer aufräumen mittlere Priorität')).toMatchObject({ title: 'Zimmer aufräumen', priority: 'medium' });
+    expect(p('Zimmer aufräumen Prio mittel')).toMatchObject({ title: 'Zimmer aufräumen', priority: 'medium' });
+    expect(p('Fotos sortieren niedrige Priorität')).toMatchObject({ title: 'Fotos sortieren', priority: 'low' });
+    expect(p('Fotos sortieren unwichtig')).toMatchObject({ title: 'Fotos sortieren', priority: 'low' });
+    expect(p('Fotos sortieren nicht so wichtig')).toMatchObject({ title: 'Fotos sortieren', priority: 'low' });
+    expect(p('Fotos sortieren prio niedrig').chips.some((c) => c.label === 'Niedrig')).toBe(true);
+  });
+
+  it('kombiniert mit Tag und Frist', () => {
+    expect(p('bis Freitag Referat hohe Priorität')).toMatchObject({ title: 'Referat', priority: 'high', deadline: true });
+  });
 });
 
 describe('Wiederholung', () => {

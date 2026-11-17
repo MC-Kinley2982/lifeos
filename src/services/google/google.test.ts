@@ -4,7 +4,7 @@ import { routineSource, SCHOOL_SOURCE } from '../../domain/sources';
 import { addDays } from '../../domain/time';
 import type { CalendarEvent, DateKey, GoogleCalendarSettings, Todo } from '../../domain/types';
 import { GoogleApiError, type GEvent, type GoogleCalendarApi } from './api';
-import { buildDesiredEvents, eventIdFor, LIFEOS_MARK, mapGoogleEvents, syncGoogleCalendar, type GoogleSyncData } from './sync';
+import { buildDesiredEvents, eventIdFor, LIFEOS_MARK, mapGoogleEvents, syncGoogleCalendar, syncOverview, type GoogleSyncData } from './sync';
 
 const TODAY: DateKey = '2026-10-06';
 const NOW = new Date(`${TODAY}T09:00:00`);
@@ -114,6 +114,20 @@ describe('Google Kalender: Übertragen', () => {
     const schoolOnly = keys(makeData({ school: true }));
     expect(schoolOnly.length).toBeGreaterThan(0);
     expect(schoolOnly.filter((k) => all.includes(k))).toEqual([]);
+  });
+
+  it('Übersicht: zählt je Schalter und nennt die nächsten Einträge', () => {
+    expect(syncOverview(makeData(), NOW, TZ)).toMatchObject({ total: 0, upcoming: [] });
+
+    const data = makeData({ events: true, routines: true });
+    const o = syncOverview(data, NOW, TZ, 3);
+    expect(o.counts.events).toBe(data.events.filter((e) => e.source === 'local' && e.date >= TODAY).length);
+    expect(o.counts.routines).toBeGreaterThan(0);
+    expect(o.counts.school).toBe(0);
+    expect(o.total).toBe(Object.values(o.counts).reduce((a, b) => a + b, 0));
+    expect(o.upcoming.length).toBeLessThanOrEqual(3);
+    const keys = o.upcoming.map((u) => `${u.date}T${u.time ?? '00:00'}`);
+    expect([...keys].sort()).toEqual(keys);
   });
 
   it('keine doppelten Events durch wiederholte Synchronisierung – auch nicht von zwei Geräten', async () => {

@@ -61,6 +61,7 @@ const MONTH_INDEX: Record<string, number> = {
   jan: 1, feb: 2, mär: 3, maerz: 3, apr: 4, mai: 5, jun: 6, jul: 7, aug: 8, sep: 9, okt: 10, nov: 11, dez: 12,
 };
 const MASK = '\u0001';
+const PRIORITY_CHIP: Record<Priority, string> = { low: 'Niedrig', medium: 'Mittel', high: 'Wichtig', urgent: 'Dringend' };
 
 const num = (s: string) => (/^\d+$/.test(s) ? Number(s) : (NUMBER_WORDS[s] ?? NaN));
 const monthOf = (s: string) => MONTH_INDEX[s.slice(0, 3) === 'mae' ? 'maerz' : s.slice(0, 3)] ?? MONTH_INDEX[s];
@@ -317,6 +318,22 @@ const RULES: Rule[] = [
   },
 
   // ── Priorität ──
+  // Ausdrücklich genannte Stufe ("niedrige Priorität", "prio hoch") – vor "wichtig", damit "nicht so wichtig" nicht als wichtig zählt.
+  {
+    kind: 'priority',
+    re: rx(`${L}(?:niedrige[rs]?\\s+prio(?:rität|ritaet)?|prio(?:rität|ritaet)?\\s*[:=]?\\s*(?:niedrig|gering)|unwichtig|nicht\\s+(?:so\\s+)?wichtig)${R}`),
+    apply: (_m, c) => setPriority(c, 'low'),
+  },
+  {
+    kind: 'priority',
+    re: rx(`${L}(?:mittlere[rs]?|normale[rs]?)\\s+prio(?:rität|ritaet)?${R}|${L}prio(?:rität|ritaet)?\\s*[:=]?\\s*(?:mittel|normal)${R}`),
+    apply: (_m, c) => setPriority(c, 'medium'),
+  },
+  {
+    kind: 'priority',
+    re: rx(`${L}(?:hohe[rs]?\\s+prio(?:rität|ritaet)?|prio(?:rität|ritaet)?\\s*[:=]?\\s*hoch)${R}`),
+    apply: (_m, c) => setPriority(c, 'high'),
+  },
   { kind: 'priority', re: rx(`${L}(?:sehr\\s+wichtig|dringend|prio\\s*1|p1)${R}`), apply: (_m, c) => setPriority(c, 'urgent') },
   { kind: 'priority', re: rx(`${L}(?:wichtig|prio\\s*2|p2)${R}`), apply: (_m, c) => setPriority(c, 'high') },
   { kind: 'priority', re: rx(`!+(?=\\s|$)`), apply: (m, c) => setPriority(c, m[0].length >= 2 ? 'urgent' : 'high') },
@@ -426,6 +443,6 @@ export function parseQuickAdd(input: string, opts: QuickParseOptions): QuickPars
   if (result.time) result.chips.push({ kind: 'time', label: result.time });
   if (result.timeOfDay) result.chips.push({ kind: 'timeOfDay', label: TIME_OF_DAY_LABEL[result.timeOfDay] });
   if (result.durationMin) result.chips.push({ kind: 'duration', label: formatDuration(result.durationMin) });
-  if (result.priority) result.chips.push({ kind: 'priority', label: result.priority === 'urgent' ? 'Dringend' : 'Wichtig' });
+  if (result.priority) result.chips.push({ kind: 'priority', label: PRIORITY_CHIP[result.priority] });
   return result;
 }

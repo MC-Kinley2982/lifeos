@@ -1,7 +1,7 @@
 import { CATEGORY_IDS } from '../../domain/defaults';
 import { routineSource } from '../../domain/sources';
 import { addDays, MINUTES_PER_DAY, minutesSinceMidnight, toDateKey, toHHMM, toMinutes } from '../../domain/time';
-import type { CalendarEvent, DateKey, GoogleCalendarSettings, GoogleReminder, ID, Todo } from '../../domain/types';
+import type { CalendarEvent, DateKey, GoogleCalendarSettings, GoogleReminder, GoogleSyncCategory, ID, Todo } from '../../domain/types';
 import { buildDaySchedule } from '../planner/schedule';
 import type { PlannerData } from '../planner/types';
 import { subjectById, subjectLabel } from '../school/timetable';
@@ -93,13 +93,16 @@ export function remindersFor(r: GoogleReminder): GReminders {
 
 export interface DesiredEvent {
   key: string;
+  /** Welcher Schalter ("In Google Kalender eintragen") diesen Eintrag erzeugt. */
+  category: GoogleSyncCategory;
   event: GEvent;
   todoId?: ID;
 }
 
-function desired(key: string, body: Omit<GEvent, 'id'>, todoId?: ID): DesiredEvent {
+function desired(category: GoogleSyncCategory, key: string, body: Omit<GEvent, 'id'>, todoId?: ID): DesiredEvent {
   const hash = fingerprint(body);
   return {
+    category,
     key,
     todoId,
     event: { id: eventIdFor(key), ...body, extendedProperties: { private: { [LIFEOS_MARK]: '1', lifeosKey: key, lifeosHash: hash } } },
@@ -118,7 +121,7 @@ export function buildDesiredEvents(data: GoogleSyncData, settings: GoogleCalenda
       if (e.source !== 'local' || !inRange(e.date)) continue; // Google-Termine nie zurückschreiben
       if (!e.allDay && toMinutes(e.end) <= toMinutes(e.start)) continue;
       out.push(
-        desired(`event:${e.id}`, {
+        desired('events', `event:${e.id}`, {
           summary: e.title || 'Termin',
           description: e.description ? `${e.description}\n\n${NOTE}` : NOTE,
           ...(e.location ? { location: e.location } : {}),
@@ -137,7 +140,7 @@ export function buildDesiredEvents(data: GoogleSyncData, settings: GoogleCalenda
         if (b.done || !inRange(b.date)) continue;
         const start = toMinutes(b.start);
         out.push(
-          desired(`homework:${hw.id}:${b.id}`, {
+          desired('homework', `homework:${hw.id}:${b.id}`, {
             summary: `${label.name}: ${hw.title || 'Hausaufgabe'}`,
             description: `Hausaufgabe · ${NOTE}`,
             ...timed(b.date, start, start + b.durationMin, timeZone),
@@ -155,7 +158,7 @@ export function buildDesiredEvents(data: GoogleSyncData, settings: GoogleCalenda
         if (s.done || !inRange(s.date)) continue;
         const start = toMinutes(s.start);
         out.push(
-          desired(`study:${exam.id}:${s.id}`, {
+          desired('study', `study:${exam.id}:${s.id}`, {
             summary: `Lernen: ${label.name} · ${exam.title}`,
             description: `Lernzeit · ${NOTE}`,
             ...timed(s.date, start, start + s.durationMin, timeZone),
@@ -189,6 +192,7 @@ export function buildDesiredEvents(data: GoogleSyncData, settings: GoogleCalenda
         todo.reminder && when.start.dateTime ? { useDefault: false, overrides: [{ method: 'popup', minutes: todo.reminder.minutesBefore }] } : { useDefault: false, overrides: [] };
       out.push(
         desired(
+          'todos',
           `todo:${todo.id}`,
           { summary: todo.title, description: todo.note ? `${todo.note}\n\n${NOTE}` : `To-do · ${NOTE}`, ...when, reminders: todoReminders },
           todo.id,
@@ -203,12 +207,39 @@ export function buildDesiredEvents(data: GoogleSyncData, settings: GoogleCalenda
     for (let d = range.from; d < range.to; d = addDays(d, 1)) {
       for (const b of buildDaySchedule(data, d).blocks) {
         if (b.kind === 'school' ? !push.school : b.kind !== 'routine' || !push.routines || optedOut.has(b.sourceKey)) continue;
-        out.push(desired(`routine:${b.sourceKey}:${d}`, { summary: b.title, description: `Routine · ${NOTE}`, ...timed(d, b.start, b.end, timeZone), reminders }));
+        out.push(desired(b.kind === 'school' ? 'school' : 'routines', `routine:${b.sourceKey}:${d}`, { summary: b.title, description: `Routine · ${NOTE}`, ...timed(d, b.start, b.end, timeZone), reminders }));
       }
     }
   }
 
   return out;
+}
+
+/** Kurzüberblick für die Einstellungen: was LifeOS laut aktuellen Schaltern in Google eingetragen hat bzw. beim nächsten Abgleich einträgt. */
+export interface SyncOverview {
+  counts: Record<GoogleSyncCategory, number>;
+  total: number;
+  /** Die nächsten Einträge (zeitlich sortiert), ab heute. */
+  upcoming: Array<{ category: GoogleSyncCategory; title: string; date: DateKey; time?: string }>;
+}
+
+export function syncOverview(data: GoogleSyncData, now: Date, timeZone: string, limit = 5): SyncOverview {
+  const wanted = buildDesiredEvents(data, data.settings.integrations.googleCalendar, syncRange(now), timeZone);
+  const counts: SyncOverview['counts'] = { events: 0, homework: 0, study: 0, todos: 0, routines: 0, school: 0 };
+  for (const w of wanted) counts[w.category]++;
+  const startOf = (w: DesiredEvent) => w.event.start.dateTime ?? `${w.event.start.date}T00:00:00`;
+  const today = toDateKey(now);
+  const upcoming = wanted
+    .filter((w) => startOf(w).slice(0, 10) >= today)
+    .sort((a, b) => startOf(a).localeCompare(startOf(b)))
+    .slice(0, limit)
+    .map((w) => ({
+      category: w.category,
+      title: w.event.summary ?? '',
+      date: startOf(w).slice(0, 10),
+      time: w.event.start.dateTime ? startOf(w).slice(11, 16) : undefined,
+    }));
+  return { counts, total: wanted.length, upcoming };
 }
 
 // ─── Schreiben ───────────────────────────────────────────────

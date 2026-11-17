@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CalendarClock, ChevronDown, Link2, MapPin, Plus } from 'lucide-react';
+import { hrefFor, PATHS } from '../../app/router';
 import { formatDuration, relativeDayLabel, toDateKey, toMinutes } from '../../domain/time';
 import type { CalendarEvent } from '../../domain/types';
 import { pastEvents, upcomingEvents } from '../../services/calendar/eventQueries';
@@ -97,7 +98,13 @@ export function EventsPage() {
 
       <div className="mt-6 flex items-start gap-2 rounded-2xl border border-dashed border-line px-4 py-3 text-xs text-ink-faint">
         <Link2 size={14} className="mt-0.5 shrink-0" />
-        Später kann hier Google Calendar angebunden werden – importierte Termine erscheinen dann automatisch in Tages- und Wochenansicht.
+        <span>
+          Google Kalender verbindest du unter{' '}
+          <a href={hrefFor(PATHS.settings('konto'))} className="text-violet-300 hover:underline">
+            Einstellungen → Konto &amp; Integrationen
+          </a>
+          . Importierte Google-Termine erscheinen dann automatisch in Tages- und Wochenansicht; hier legst du eigene LifeOS-Termine an.
+        </span>
       </div>
 
       {editing && <EventForm event={editing === 'new' ? undefined : editing} defaultDate={today} onClose={() => setEditing(null)} />}
