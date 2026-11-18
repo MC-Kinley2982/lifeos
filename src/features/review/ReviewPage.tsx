@@ -12,6 +12,7 @@ import { Button, IconButton } from '../../ui/Button';
 import { Card, CardHeader, PageHeader } from '../../ui/Card';
 import { alpha, cn } from '../../ui/cn';
 import { GoalProgressRow } from '../goals/GoalProgressRow';
+import { ComputerCard } from './ComputerCard';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HISTORY_WEEKS = 8;
@@ -123,6 +124,7 @@ export function ReviewPage({ weekParam }: { weekParam?: string }) {
               </div>
             )}
           </Card>
+          <ComputerCard week={stats.computer} />
           <DoneCard stats={stats} />
           {stats.grades.length > 0 && <GradesCard grades={stats.grades} />}
         </div>

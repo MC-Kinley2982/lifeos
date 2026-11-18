@@ -23,6 +23,7 @@ export function plannerDataFrom(state: AppState): PlannerData {
     timetable: state.timetable,
     homework: state.homework,
     exams: state.exams,
+    focusDays: state.focusDays,
   };
 }
 

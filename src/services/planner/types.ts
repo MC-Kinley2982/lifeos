@@ -5,6 +5,7 @@ import type {
   EnergyLevel,
   EnergyState,
   Exam,
+  FocusDay,
   Goal,
   Homework,
   ID,
@@ -37,6 +38,8 @@ export interface PlannerData {
   timetable: TimetableEntry[];
   homework: Homework[];
   exams: Exam[];
+  /** Rechnerzeit aus dem Focus Co-Pilot (optional – ohne Anbindung leer). */
+  focusDays?: FocusDay[];
 }
 
 export interface PlanItem {
@@ -123,4 +126,6 @@ export interface GoalProgress {
   plannedMin: number;
   remainingMin: number;
   percent: number;
+  /** Davon automatisch vom Rechner erfasst (Focus Co-Pilot) – bereits in `doneMin` enthalten. */
+  trackedMin?: number;
 }

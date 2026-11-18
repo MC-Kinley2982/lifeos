@@ -238,7 +238,8 @@ src/
     vocab/             Lernkartei: Leitner-Boxen, fällige Karten, Antwortprüfung, Listen-Import (leitner.ts)
     cloud/             CloudBackend-Interface, Supabase-Adapter, In-Memory-Server (Tests/Dev-Mock)
     sync/              Sync-Engine (Outbox, Pull/Push, Konflikte, erster Login), Datensatz-Abbildung
-    calendar/ focus/ ai/   Platzhalter für Google Calendar, Focus Co-Pilot, KI-Planer
+    focus/             Rechnerzeit aus dem Focus Co-Pilot (days.ts: Ziel-Zuordnung, Wochensumme, Vorschläge)
+    calendar/ ai/      Platzhalter für Google Calendar, KI-Planer
     todos/             To-do-Liste: Abschnitte, Wiederholungen (repeat.ts), Kurzbefehl-Links (links.ts)
     storage/           Persistenz-Adapter (localStorage, versioniert; Migrationen in store/persistence.ts)
   store/               useAppStore (Slices: settings, routines, events, tasks, goals, daily, school, data),
@@ -249,6 +250,21 @@ src/
 supabase/              SQL-Migration + RLS-Test
 dev/                   Vite-Plugin für die simulierte Cloud (nur Entwicklung)
 ```
+
+### Focus Co-Pilot (Rechnerzeit)
+
+Der Focus Co-Pilot (Windows-App, Schwesterprojekt) misst, was am Rechner passiert, und schickt **pro Tag** die Minuten an
+dasselbe Supabase-Konto: Sammlung `focusDays` in `lifeos_records` (ID = Datum; Gesamtzeit, Zeit je Einstufung, je Gruppe,
+optional die meistgenutzten Apps/Websites – nur Namen). LifeOS **liest** diese Tage nur (`FocusDay` in `domain/types.ts`);
+keine neue Tabelle und keine Migration nötig.
+
+- **Zuordnung:** am Ziel `focusMatch` (Namen von Gruppen, Apps oder Websites; im Formular „Automatisch vom Rechner zählen“).
+  Pro Name zählt zuerst eine gleichnamige Gruppe, sonst gleichnamige Apps/Websites (`focusMinutesFor`).
+- **Fortschritt:** echte Zeit zählt auf das Ziel. Für Tage mit Co-Pilot-Daten ersetzt sie die Annahme „die verknüpfte
+  Routine hat stattgefunden“; Tage ohne Daten (Rechner aus) behalten die bisherige Annahme.
+- **Rückblick:** Karte „Am Rechner“ (Gesamtzeit, Einstufung, Gruppen, Meistgenutzt); die Rechnerzeit der Ziele steckt in „Geschaffte Zeit“.
+- **Einrichten:** Einstellungen → Konto → „Verbindungsdaten kopieren“, im Co-Pilot unter Einstellungen → LifeOS einfügen und
+  mit dem LifeOS-Konto anmelden. Der Tag ist der Nutzungstag des Co-Pilots (beginnt dort um 04:00).
 
 ### Grundprinzipien
 
@@ -261,6 +277,6 @@ dev/                   Vite-Plugin für die simulierte Cloud (nur Entwicklung)
 
 ### Bewusst noch nicht umgesetzt
 
-Google Calendar, Focus Co-Pilot, KI-Planung, Push-Benachrichtigungen, Echtzeit-Sync (Supabase Realtime),
+Google Calendar, KI-Planung, Push-Benachrichtigungen, Echtzeit-Sync (Supabase Realtime),
 feldgenaues Zusammenführen bei Konflikten (aktuell: neuere Änderung pro Eintrag gewinnt), A/B-Wochen im Stundenplan,
 Oberstufen-Punkte (0–15) bei den Noten, Passwort-zurücksetzen-Seite.

@@ -1,5 +1,6 @@
 import { addDays, parseDateKey, toDateKey, weekDays } from '../../domain/time';
 import type { DateKey, Goal, Grade, Homework, Task, Todo, Weekday } from '../../domain/types';
+import { focusWeek, type FocusWeek } from '../focus/days';
 import { computeGoalProgress } from '../planner/goals';
 import { buildDaySchedule, WORK_KINDS } from '../planner/schedule';
 import type { GoalProgress, PlannerData } from '../planner/types';
@@ -32,8 +33,10 @@ export interface WeekStats {
   studySessions: { count: number; minutes: number };
   /** Erledigte Einträge insgesamt (Aufgaben + To-dos + Hausaufgaben). */
   doneCount: number;
-  /** Geschaffte Zeit: Aufgaben, Hausaufgaben (tatsächlich oder geschätzt), Lerneinheiten, Ziel-Einträge. */
+  /** Geschaffte Zeit: Aufgaben, Hausaufgaben (tatsächlich oder geschätzt), Lerneinheiten, Ziel-Einträge, Rechnerzeit für Ziele. */
   focusMin: number;
+  /** Was der Focus Co-Pilot in dieser Woche am Rechner erfasst hat (leer ohne Anbindung). */
+  computer: FocusWeek;
   goals: Array<{ goal: Goal; progress: GoalProgress }>;
   /** Durchschnittlicher Ziel-Fortschritt (0–100) der aktiven Ziele, null ohne Ziele. */
   goalPercent: number | null;
@@ -74,14 +77,16 @@ export function weekStats(data: StatsData, weekStart: DateKey, now: Date, opts: 
   const sessions = data.exams.flatMap((e) => e.studySessions).filter((s) => s.done && inWeek(s.date));
   const goalLogMin = data.goals.flatMap((g) => g.log).filter((l) => inWeek(l.date)).reduce((s, l) => s + l.minutes, 0);
 
+  const tasks = doneTasks.filter((t) => !t.todoId);
+  const progress = computeGoalProgress(data, dates, now);
+  const trackedGoalMin = Object.values(progress).reduce((s, p) => s + (p.trackedMin ?? 0), 0);
+
   const focusMin =
     doneTasks.reduce((s, t) => s + (t.actualMin ?? t.estimatedMin), 0) +
     homework.reduce((s, h) => s + (h.actualMinutes ?? h.estimatedMinutes), 0) +
     sessions.reduce((s, b) => s + b.durationMin, 0) +
-    goalLogMin;
-
-  const tasks = doneTasks.filter((t) => !t.todoId);
-  const progress = computeGoalProgress(data, dates, now);
+    goalLogMin +
+    trackedGoalMin;
   const goals = data.goals.filter((g) => g.active).map((goal) => ({ goal, progress: progress[goal.id] })).filter((g) => !!g.progress);
   const goalPercent = goals.length ? Math.round(goals.reduce((s, g) => s + g.progress.percent, 0) / goals.length) : null;
 
@@ -100,6 +105,7 @@ export function weekStats(data: StatsData, weekStart: DateKey, now: Date, opts: 
     studySessions: { count: sessions.length, minutes: sessions.reduce((s, b) => s + b.durationMin, 0) },
     doneCount: tasks.length + todos.length + homework.length,
     focusMin,
+    computer: focusWeek(data.focusDays, dates),
     goals,
     goalPercent,
     days,

@@ -7,6 +7,7 @@ export function GoalProgressRow({ goal, progress }: { goal: Goal; progress?: Goa
   const target = goal.target.minutes;
   const done = progress?.doneMin ?? 0;
   const planned = progress?.plannedMin ?? 0;
+  const tracked = progress?.trackedMin ?? 0;
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between gap-3">
@@ -16,7 +17,13 @@ export function GoalProgressRow({ goal, progress }: { goal: Goal; progress?: Goa
         </span>
       </div>
       <ProgressBar value={target ? (done / target) * 100 : 0} planned={target ? (planned / target) * 100 : 0} color={goal.color} />
-      {planned > 0 && <div className="mt-1 text-[11px] text-ink-faint">+ {formatHoursClock(planned)} h eingeplant</div>}
+      {(planned > 0 || tracked > 0) && (
+        <div className="mt-1 text-[11px] text-ink-faint">
+          {tracked > 0 && <>{formatHoursClock(tracked)} h automatisch vom Rechner</>}
+          {tracked > 0 && planned > 0 && ' · '}
+          {planned > 0 && <>+ {formatHoursClock(planned)} h eingeplant</>}
+        </div>
+      )}
     </div>
   );
 }

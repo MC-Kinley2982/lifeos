@@ -1,15 +1,18 @@
 import { stamp } from '../../domain/factories';
 import { createId } from '../../domain/ids';
-import type { Goal } from '../../domain/types';
+import type { FocusDay, Goal } from '../../domain/types';
 import { patchEntity, removeById } from '../helpers';
 import type { GoalActions, SliceCreator } from '../types';
 
 export interface GoalsSlice extends GoalActions {
   goals: Goal[];
+  /** Rechnerzeit aus dem Focus Co-Pilot (kommt per Cloud-Sync; hier nur gehalten, nie bearbeitet). */
+  focusDays: FocusDay[];
 }
 
 export const createGoalsSlice: SliceCreator<GoalsSlice> = (set) => ({
   goals: [],
+  focusDays: [],
 
   addGoal: (input) => {
     const goal = stamp(input, 'goal');

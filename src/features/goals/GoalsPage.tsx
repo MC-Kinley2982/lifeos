@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Plus, Sparkles, Target, X } from 'lucide-react';
+import { Monitor, Pencil, Plus, Sparkles, Target, X } from 'lucide-react';
 import { formatDateShort, formatDuration, formatHoursClock, toDateKey, weekDays } from '../../domain/time';
 import type { Goal } from '../../domain/types';
 import { useGoalProgress, useNow } from '../../store/hooks';
@@ -55,7 +55,7 @@ export function GoalsPage() {
             const p = progress[goal.id];
             const linked = tasks.filter((t) => t.goalId === goal.id && t.status !== 'done').length;
             return (
-              <GoalCard key={goal.id} goal={goal} done={p?.doneMin ?? 0} planned={p?.plannedMin ?? 0} openTasks={linked} today={today} week={week} onEdit={() => setEditing(goal)} />
+              <GoalCard key={goal.id} goal={goal} done={p?.doneMin ?? 0} planned={p?.plannedMin ?? 0} tracked={p?.trackedMin ?? 0} openTasks={linked} today={today} week={week} onEdit={() => setEditing(goal)} />
             );
           })}
         </div>
@@ -71,13 +71,15 @@ interface GoalCardProps {
   goal: Goal;
   done: number;
   planned: number;
+  /** Davon automatisch vom Rechner (Focus Co-Pilot). */
+  tracked: number;
   openTasks: number;
   today: string;
   week: string[];
   onEdit: () => void;
 }
 
-function GoalCard({ goal, done, planned, openTasks, today, week, onEdit }: GoalCardProps) {
+function GoalCard({ goal, done, planned, tracked, openTasks, today, week, onEdit }: GoalCardProps) {
   const { logGoalTime, removeGoalLog } = useAppStore.getState();
   const target = goal.target.minutes;
   const pct = target ? Math.round((done / target) * 100) : 0;
@@ -109,6 +111,11 @@ function GoalCard({ goal, done, planned, openTasks, today, week, onEdit }: GoalC
       </div>
       <ProgressBar className="mt-2 h-2.5" value={target ? (done / target) * 100 : 0} planned={target ? (planned / target) * 100 : 0} color={goal.color} />
       <div className="mt-2 flex flex-wrap gap-x-4 text-xs text-ink-muted">
+        {tracked > 0 && (
+          <span className="inline-flex items-center gap-1 text-sky-300">
+            <Monitor size={12} /> {formatHoursClock(tracked)} h automatisch vom Rechner
+          </span>
+        )}
         {planned > 0 && <span>+ {formatHoursClock(planned)} h eingeplant</span>}
         <span>noch {formatHoursClock(Math.max(0, target - done - planned))} h offen</span>
         {openTasks > 0 && <span>{openTasks} offene Aufgabe{openTasks > 1 ? 'n' : ''}</span>}

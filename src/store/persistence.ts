@@ -1,5 +1,6 @@
 import { CATEGORY_IDS, createDefaultSettings, defaultSchoolSettings, STATE_IDS } from '../domain/defaults';
 import type { Exam, Homework, Routine, SchoolSettings, Settings, Todo } from '../domain/types';
+import { isFocusDay } from '../services/focus/days';
 import { GOAL_SESSION_DESCRIPTION } from './slices/tasksSlice';
 import type { AppData, AppState } from './types';
 
@@ -20,6 +21,7 @@ export const DATA_KEYS = [
   'grades',
   'vocabDecks',
   'vocabCards',
+  'focusDays',
 ] as const;
 
 export function pickData(state: AppState): AppData {
@@ -40,6 +42,7 @@ export function pickData(state: AppState): AppData {
     grades: state.grades,
     vocabDecks: state.vocabDecks,
     vocabCards: state.vocabCards,
+    focusDays: state.focusDays,
   };
 }
 
@@ -61,6 +64,7 @@ export function emptyData(): AppData {
     grades: [],
     vocabDecks: [],
     vocabCards: [],
+    focusDays: [],
   };
 }
 
@@ -134,6 +138,7 @@ export function normalizeData(raw: Partial<AppData> | undefined): AppData {
     grades: arr(raw.grades),
     vocabDecks: arr(raw.vocabDecks),
     vocabCards: arr(raw.vocabCards),
+    focusDays: arr(raw.focusDays).filter(isFocusDay),
   };
 }
 
@@ -154,6 +159,8 @@ const OLD_DEFAULT_MIN_BLOCK = 15;
  *          Erkennung. Alles kommt über Standardwerte in normalizeData dazu – keine Umwandlung nötig.
  * V6 → V7: Vokabeln (Sammlungen `vocabDecks` und `vocabCards`, Einstellungen `settings.vocab`) –
  *          ebenfalls nur neue Standardwerte.
+ * (ohne neue Version) Rechnerzeit aus dem Focus Co-Pilot: Sammlung `focusDays`, optional `goal.focusMatch` –
+ *          alles optional, kommt über normalizeData dazu.
  */
 export function migrate(persisted: unknown, version: number): Partial<AppData> {
   const data = (persisted ?? {}) as Partial<AppData>;

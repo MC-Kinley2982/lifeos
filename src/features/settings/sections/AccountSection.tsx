@@ -6,6 +6,7 @@ import { toast } from '../../../ui/toast';
 import { AuthForm } from '../../cloud/AuthForm';
 import { SyncIndicator } from '../../cloud/SyncIndicator';
 import { SettingRow, SettingsGroup } from '../SettingsLayout';
+import { FocusCoPilotGroup } from './FocusCoPilotGroup';
 import { GoogleCalendarGroup } from './GoogleCalendarGroup';
 
 function formatTime(iso?: string): string {
@@ -18,6 +19,7 @@ export function AccountSection() {
   return (
     <div className="space-y-4">
       <CloudAccount />
+      <FocusCoPilotGroup />
       <GoogleCalendarGroup />
     </div>
   );

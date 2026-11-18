@@ -22,6 +22,7 @@ export function usePlannerData(): PlannerData {
       timetable: s.timetable,
       homework: s.homework,
       exams: s.exams,
+      focusDays: s.focusDays,
     })),
   );
 }

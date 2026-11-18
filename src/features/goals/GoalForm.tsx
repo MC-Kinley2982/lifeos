@@ -8,6 +8,7 @@ import { Field, NumberInput, TextArea, TextInput } from '../../ui/fields';
 import { Sheet } from '../../ui/Sheet';
 import { toast } from '../../ui/toast';
 import { CategorySelect } from '../shared/selects';
+import { FocusMatchField } from './FocusMatchField';
 
 export function GoalForm({ goal, onClose }: { goal?: Goal; onClose: () => void }) {
   const settings = useAppStore((s) => s.settings);
@@ -21,7 +22,12 @@ export function GoalForm({ goal, onClose }: { goal?: Goal; onClose: () => void }
 
   const save = () => {
     if (!draft.title.trim()) return;
-    const next = { ...draft, title: draft.title.trim(), sessionMin: Math.max(15, draft.sessionMin || 15) };
+    const next = {
+      ...draft,
+      title: draft.title.trim(),
+      sessionMin: Math.max(15, draft.sessionMin || 15),
+      focusMatch: draft.focusMatch?.length ? draft.focusMatch : undefined,
+    };
     if (goal) updateGoal(goal.id, next);
     else addGoal(next);
     toast(goal ? 'Ziel gespeichert' : 'Ziel angelegt');
@@ -88,6 +94,12 @@ export function GoalForm({ goal, onClose }: { goal?: Goal; onClose: () => void }
             />
           </Field>
         </div>
+        <Field
+          label="Automatisch vom Rechner zählen"
+          hint="Namen von Gruppen, Apps oder Websites aus dem Focus Co-Pilot. Ihre Zeit zählt dann von selbst auf dieses Ziel – nimm pro Zeit nur eine Gruppe oder die einzelnen Apps, nicht beides."
+        >
+          <FocusMatchField value={draft.focusMatch ?? []} onChange={(v) => set('focusMatch', v)} />
+        </Field>
         <Field label="Farbe">
           <ColorPicker value={draft.color} onChange={(c) => set('color', c)} />
         </Field>

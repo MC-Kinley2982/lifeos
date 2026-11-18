@@ -22,6 +22,7 @@ export const LIST_COLLECTIONS = [
   'grades',
   'vocabDecks',
   'vocabCards',
+  'focusDays',
 ] as const;
 
 type ListCollection = (typeof LIST_COLLECTIONS)[number];

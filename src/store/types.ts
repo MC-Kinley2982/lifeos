@@ -11,6 +11,7 @@ import type {
   EnergySettings,
   EnergyTimeWindow,
   Exam,
+  FocusDay,
   Goal,
   GoogleCalendarSettings,
   Grade,
@@ -77,6 +78,8 @@ export interface AppData {
   grades: Grade[];
   vocabDecks: VocabDeck[];
   vocabCards: VocabCard[];
+  /** Rechnerzeit pro Tag aus dem Focus Co-Pilot – wird nur von dort geschrieben (Cloud), nie in der App bearbeitet. */
+  focusDays: FocusDay[];
 }
 
 export type BlockOwner = { kind: 'homework'; id: ID } | { kind: 'exam'; id: ID };

@@ -506,8 +506,43 @@ export interface Goal {
   preferredTimeOfDay?: TimeOfDay;
   active: boolean;
   log: GoalLogEntry[];
+  /**
+   * Namen aus dem Focus Co-Pilot (Gruppen, Apps oder Websites), deren erfasste Rechnerzeit
+   * automatisch auf dieses Ziel zählt. Groß-/Kleinschreibung ist egal.
+   */
+  focusMatch?: string[];
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Rechnerzeit aus dem Focus Co-Pilot
+// ─────────────────────────────────────────────────────────────
+
+/** Ein Eintrag einer Gruppe, App oder Website mit seiner Zeit. */
+export interface FocusEntry {
+  name: string;
+  minutes: number;
+}
+
+/**
+ * Was der Focus Co-Pilot an einem Tag am Rechner erfasst hat (ein Datensatz pro Tag, `id` = Datum).
+ * Wird nur vom Co-Pilot geschrieben und über die Cloud synchronisiert – LifeOS liest es nur.
+ * Der Tag folgt dem Nutzungstag des Co-Pilots (beginnt dort um 04:00).
+ */
+export interface FocusDay {
+  id: DateKey;
+  date: DateKey;
+  /** Aktive Zeit am Rechner insgesamt. */
+  totalMin: number;
+  /** Aufteilung nach Einstufung des Co-Pilots. */
+  byCategory: { productive: number; neutral: number; unproductive: number };
+  /** Gruppen des Co-Pilots (z. B. "Blender", "Schach"). */
+  groups: FocusEntry[];
+  /** Meistgenutzte Apps/Websites (nur Namen, keine Titel oder Adressen) – optional. */
+  activities?: Array<FocusEntry & { kind?: 'app' | 'web' }>;
+  /** Wann der Co-Pilot den Tag zuletzt berechnet hat. */
+  sentAt?: ISODateTime;
 }
 
 // ─────────────────────────────────────────────────────────────

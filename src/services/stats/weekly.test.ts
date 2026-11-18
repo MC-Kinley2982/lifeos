@@ -67,6 +67,27 @@ describe('Wochenrückblick', () => {
     expect(stats.goalPercent).not.toBeNull();
   });
 
+  it('Rechnerzeit aus dem Co-Pilot: Block "Am Rechner" und geschaffte Zeit für Ziele', () => {
+    const goal = store().goals[0];
+    store().updateGoal(goal.id, { focusMatch: ['Blender'] });
+    const mk = (date: DateKey, minutes: number) => ({
+      id: date,
+      date,
+      totalMin: 120,
+      byCategory: { productive: 100, neutral: 20, unproductive: 0 },
+      groups: [{ name: 'Blender', minutes }],
+    });
+    useAppStore.setState({ focusDays: [mk('2026-10-06', 50), mk('2026-10-08', 25), mk('2026-09-30', 999)] });
+    const stats = weekStats(data(), MON, new Date(at('2026-10-11')));
+    expect(stats.computer.daysTracked).toBe(2);
+    expect(stats.computer.totalMin).toBe(240);
+    expect(stats.computer.groups).toEqual([{ name: 'Blender', minutes: 75 }]);
+    expect(stats.focusMin).toBe(75); // nur die Rechnerzeit des Ziels, sonst wurde nichts abgehakt
+    const progress = stats.goals.find((g) => g.goal.id === goal.id)!.progress;
+    expect(progress.trackedMin).toBe(75);
+    expect(weekStats(data(), '2026-09-28', new Date(at('2026-10-11'))).computer.totalMin).toBe(120);
+  });
+
   it('Verlauf der letzten Wochen (älteste zuerst)', () => {
     const history = weekHistory(data(), MON, 4, new Date(at(MON)));
     expect(history.map((h) => [h.weekStart, h.week])).toEqual([
